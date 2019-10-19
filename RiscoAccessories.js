@@ -110,7 +110,7 @@ RiscoCPPartitions.prototype = {
     async setTargetState(state, callback) {
         var self = this;
 
-        self.log.info('Setting state to %s', state);
+        self.log.debug('Setting %s state to %s', self.name, state);
         try{
             var riscoArm;
             var cmd;
@@ -129,25 +129,24 @@ RiscoCPPartitions.prototype = {
                 case 0:
                     // stayArm = 0
                     riscoArm = true;
-                    cmd = ((self.RiscoPartId == null)?'':self.RiscoPartId) + cmd_separator + self.RiscoSession.DiscoveredAccessories.partitions[PartId].homeCommand;
+                    cmd = (self.RiscoPartId | '') + cmd_separator + self.RiscoSession.DiscoveredAccessories.partitions[PartId].homeCommand;
                     break;
                 case 1:
                     // stayArm = 1
                     riscoArm = true;
-                    cmd = ((self.RiscoPartId == null)?'':self.RiscoPartId) + cmd_separator + self.RiscoSession.DiscoveredAccessories.partitions[PartId].armCommand;
+                    cmd = (self.RiscoPartId | '') + cmd_separator + self.RiscoSession.DiscoveredAccessories.partitions[PartId].armCommand;
                     break;
                 case 2:
                     // stayArm = 2
                     riscoArm = true;
-                    cmd = ((self.RiscoPartId == null)?'':self.RiscoPartId) + cmd_separator + self.RiscoSession.DiscoveredAccessories.partitions[PartId].nightCommand;
+                    cmd = (self.RiscoPartId | '') + cmd_separator + self.RiscoSession.DiscoveredAccessories.partitions[PartId].nightCommand;
                     break;
                 case 3:
                     // stayArm = 3
                     riscoArm = false
-                    cmd = ((self.RiscoPartId == null)?'':self.RiscoPartId) + cmd_separator + self.RiscoSession.DiscoveredAccessories.partitions[PartId].disarmCommand;
+                    cmd = (self.RiscoPartId | '') + cmd_separator + self.RiscoSession.DiscoveredAccessories.partitions[PartId].disarmCommand;
                     break;
             };
-            self.log('resulting cmd: ' + cmd);
             const ArmResp = await self.RiscoSession.armDisarm(riscoArm, cmd);
             if (ArmResp){
                 if (!self.polling){
@@ -199,7 +198,7 @@ RiscoCPPartitions.prototype = {
             }
         } catch (err) {
             self.log.error(err);
-            self.securityService.setCharacteristic(self.Characteristic.SecuritySystemCurrentState, self.riscoCurrentState);            
+            self.securityService.setCharacteristic(self.Characteristic.SecuritySystemCurrentState, self.riscoCurrentState);
             callback(null, self.riscoCurrentState);
             return
         }
@@ -232,7 +231,7 @@ RiscoCPPartitions.prototype = {
                     Datas.push(self.RiscoSession.DiscoveredAccessories.partitions[Parts]);
                 }
             }
-            const PartStates = Datas.filter(parts => parts.id == ((self.RiscoPartId == null)?'':self.RiscoPartId));
+            const PartStates = Datas.filter(parts => parts.id == (self.RiscoPartId | ''));
             if (PartStates.length != 0) {
                 self.riscoCurrentState = PartStatesRegistry[PartStates[0].actualState];
                 callback(null, self.riscoCurrentState);
