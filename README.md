@@ -58,7 +58,7 @@ To get your riscoSiteId, login to riscocloud via ChromeBrowser (first login scre
 
 In that case "12345" is your siteId which should be placed in new config file.
 
-```
+
 For beta testing :
 
 Manual addition procedure axios (based on the use of the image Docker oznu / homebridge: debian) and assuming that the container is running:
@@ -73,7 +73,7 @@ npm i --prefix ./ axios
 
 
 
-```
+
 TODO:
 * Add the ability to set the arming / partial / night / disarm commands
 * Allow the ability to monitor panels from multiple sites (only from the same RiscoCloud account) - requires modification of 'app.js' and 'risco.js'
