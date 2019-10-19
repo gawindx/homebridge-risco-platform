@@ -3,18 +3,13 @@
         {
             "accessory": "RiscoAlarm",
             "name": "RiscoAlarm",
-            "polling": true,
-            "pollInterval": 15000,
+            "polling": true|false,
+            "pollInterval": 10000,
             "riscoUsername": "",
             "riscoPassword": "",
             "riscoSiteId": 12345,
             "riscoPIN": "",
-            "armCommand": "armed",
-            "partialCommand": "partially",
-            "homeCommand": "partially"
-            "disarmCommand": "disarmed",
-            "riscoPartMode": false,
-            "riscoPartId": 0
+            "Partition": "none|all|system|0,1,.."
         }
     ]
 }
