@@ -12,7 +12,7 @@ function RiscoCPPartitions(log, accConfig, homebridge) {
     this.RiscoSession = accConfig.RiscoSession;
     this.RiscoPartId = (function(){
         if (accConfig.accessorytype == 'system'){
-            return '';
+            return null;
         } else {
             return accConfig.config.id;
         }
@@ -110,40 +110,44 @@ RiscoCPPartitions.prototype = {
     async setTargetState(state, callback) {
         var self = this;
 
-        self.log.debug('Setting state to %s', state);
+        self.log.info('Setting state to %s', state);
         try{
             var riscoArm;
             var cmd;
-            var cmd_separator = (function(){
-                if (self.RiscoPartId == ''){
-                    return '';
-                }else{
-                    return ':';
-                }
-            })();
-            const PartId = (self.RiscoPartId != '')?self.RiscoPartId:0;
+
+            var PartId;
+            var cmd_separator;
+            if (self.RiscoPartId != null ){
+                PartId = self.RiscoPartId;
+                cmd_separator = ':';
+            } else {
+                PartId = 0;
+                cmd_separator = '';
+            }
+
             switch (state) {
                 case 0:
                     // stayArm = 0
                     riscoArm = true;
-                    cmd = self.RiscoPartId + cmd_separator + self.RiscoSession.DiscoveredAccessories.partitions[PartId].homeCommand;
+                    cmd = ((self.RiscoPartId == null)?'':self.RiscoPartId) + cmd_separator + self.RiscoSession.DiscoveredAccessories.partitions[PartId].homeCommand;
                     break;
                 case 1:
                     // stayArm = 1
                     riscoArm = true;
-                    cmd = self.RiscoPartId + cmd_separator + self.RiscoSession.DiscoveredAccessories.partitions[PartId].armCommand;
+                    cmd = ((self.RiscoPartId == null)?'':self.RiscoPartId) + cmd_separator + self.RiscoSession.DiscoveredAccessories.partitions[PartId].armCommand;
                     break;
                 case 2:
                     // stayArm = 2
                     riscoArm = true;
-                    cmd = self.RiscoPartId + cmd_separator + self.RiscoSession.DiscoveredAccessories.partitions[PartId].nightCommand;
+                    cmd = ((self.RiscoPartId == null)?'':self.RiscoPartId) + cmd_separator + self.RiscoSession.DiscoveredAccessories.partitions[PartId].nightCommand;
                     break;
                 case 3:
                     // stayArm = 3
                     riscoArm = false
-                    cmd = self.RiscoPartId + cmd_separator + self.RiscoSession.DiscoveredAccessories.partitions[PartId].disarmCommand;
+                    cmd = ((self.RiscoPartId == null)?'':self.RiscoPartId) + cmd_separator + self.RiscoSession.DiscoveredAccessories.partitions[PartId].disarmCommand;
                     break;
             };
+            self.log('resulting cmd: ' + cmd);
             const ArmResp = await self.RiscoSession.armDisarm(riscoArm, cmd);
             if (ArmResp){
                 if (!self.polling){
@@ -228,7 +232,7 @@ RiscoCPPartitions.prototype = {
                     Datas.push(self.RiscoSession.DiscoveredAccessories.partitions[Parts]);
                 }
             }
-            const PartStates = Datas.filter(parts => parts.id == self.RiscoPartId);
+            const PartStates = Datas.filter(parts => parts.id == ((self.RiscoPartId == null)?'':self.RiscoPartId));
             if (PartStates.length != 0) {
                 self.riscoCurrentState = PartStatesRegistry[PartStates[0].actualState];
                 callback(null, self.riscoCurrentState);
