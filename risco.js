@@ -427,7 +427,6 @@ RiscoPanelSession.prototype = {
                             homeCommand: 'partially',
                             disarmCommand: 'disarmed'
                         };
-                        self.log('Partition type ' + self.Partition);
                         if (self.Partition == 'all') {
                             self.log.debug('All Partitions Required');
                             Part_Data.Required = true;
@@ -436,12 +435,6 @@ RiscoPanelSession.prototype = {
                             const Required_Zones = self.Partition.split(',').map(function(item) {
                                 return parseInt(item, 10);
                             });
-                            self.log('req ' + Required_Zones);
-                            self.log('includes ? ' + Required_Zones.includes(Part_Data.id));
-                            for (var dudu in Required_Zones){
-                                self.log('dudu '+ dudu);
-                            }
-
                             if (Required_Zones.includes(Part_Data.id) !== false){
                                 Part_Data.Required = true;
                             } else {

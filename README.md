@@ -46,7 +46,7 @@ Fields:
 * "Partition" => optional: accept the following options
     * "none": will not generate an accessory for partitions
     * "all": will generate an accessory for each partition
-    * "system": will generate an accessory for each partition
+    * "system": will generate an accessory for global system
     * "0,1,...": will generate an accessory for each listed partition.
         Accepts a comma-separated list of strin where each member is the id of a partition
 
