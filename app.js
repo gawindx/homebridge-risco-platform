@@ -17,9 +17,9 @@ module.exports = function (homebridge) {
 
 function RiscoPanelPlatform(log, config, api) {
     this.log = log;
+    var self = this;
     this.config = config;
 
-    var self = this;
     this.RiscoPanel = new risco.RiscoPanelSession(this.config, this.log);
 }
 
@@ -31,18 +31,23 @@ RiscoPanelPlatform.prototype = {
             var DiscoveredAccessories = {};
             try{
                 if ((self.config['Partition'] || 'none') != 'none') {
+                    self.log.debug('Discovering Partitions');
                     DiscoveredAccessories.partitions = await self.RiscoPanel.DiscoverParts();
                 }
+                if ((self.config['Groups'] || 'none') != 'none') {
+                    self.log.debug('Discovering Groups');
+                    DiscoveredAccessories.groups = await self.RiscoPanel.DiscoverGroups();
+                }
                 if ((self.config['Outputs'] || 'none') != 'none') {
+                    self.log.debug('Discovering Outputs');
                     DiscoveredAccessories.outputs = await self.RiscoPanel.DiscoverOutputs();
                 }
                 if ((self.config['Detectors'] || 'none') != 'none') {
+                    self.log.debug('Discovering Detectors');
                     DiscoveredAccessories.detectors = await self.RiscoPanel.DiscoverDetectors();
                 }
-                if ((self.config['Groups'] || 'none') != 'none') {
-                    DiscoveredAccessories.groups = await self.RiscoPanel.DiscoverGroups();
-                }
                 if ((self.config['Cameras'] || 'none') != 'none') {
+                    self.log.debug('Discovering Cameras');
                     DiscoveredAccessories.Cameras = await self.RiscoPanel.DiscoverCameras();
                 }
                 //fallback to system mode if no DiscoveredAccessories
@@ -96,6 +101,7 @@ RiscoPanelPlatform.prototype = {
                     return new riscoAccessory.RiscoCPPartitions(self.log, device, global.homebridge);
                 })());
             })();
+            self.RiscoPanel.Ready = true;
             callback(foundAccessories);
         } catch (err){
             self.log.error('Error on AddAccessory Phase : ' + err);

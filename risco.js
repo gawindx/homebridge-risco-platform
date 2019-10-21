@@ -15,6 +15,7 @@ function RiscoPanelSession(aConfig, aLog) {
     if (!(this instanceof RiscoPanelSession)) {
         return new RiscoPanelSession(aConfig, aLog);
     }
+    this.Ready = false;
     this.DiscoveredAccessories ;
     this.risco_panel_name = aConfig['name'];
     this.risco_username = encodeURIComponent(aConfig['riscoUsername']);
@@ -63,12 +64,13 @@ function RiscoPanelSession(aConfig, aLog) {
 
     this.long_event_name = 'RPS_long_' + (this.risco_panel_name.toLowerCase()).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ /g, '_');
 
+
     var self = this;
 
     // set up polling if requested
     if (self.polling) {
         self.log.info('Starting polling with an interval of %s ms', self.pollInterval);
-        var emitter = new pollingtoevent(function (done) {
+        emitter = pollingtoevent(function (done) {
             self.getCPStates(function (err, result) {
                 done(err, result);
             });
@@ -166,7 +168,7 @@ RiscoPanelSession.prototype = {
 
     async logout(callback) {
         var self = this;
-
+        self.log.debug('Entering Logout Function');
         try {
             if (self.SessionLogged) {
                 const resp_s1 = await axios({
@@ -227,6 +229,7 @@ RiscoPanelSession.prototype = {
 
     async IsUserCodeExpired(){
         var self = this;
+        self.log.debug('Check User Code expiration');
         try {
             const response = await axios({
                 url: 'https://www.riscocloud.com/ELAS/WebUI/SystemSettings/IsUserCodeExpired',
@@ -257,6 +260,7 @@ RiscoPanelSession.prototype = {
 
     async ValidateUserCode() {
         var self = this;
+        self.log.debug('User Code Validation');
         try {
             const post_data = 'code=' + self.risco_pincode;
             const response = await axios({
@@ -294,9 +298,12 @@ RiscoPanelSession.prototype = {
 
     async KeepAlive() {
         var self = this;
+        self.log.debug('Entering KeepAlive Function');
         try{
             if (!self.SessionLogged){
+                self.log.debug('Not Logged. Need to ReLogin');
                 await self.login();
+                return null;
             } else {
                 if (await self.IsUserCodeExpired() == true) {
                     self.log.debug('Code Expired')
@@ -304,6 +311,7 @@ RiscoPanelSession.prototype = {
                 }
                 self.req_counter++;
                 if (self.req_counter > 10) {
+                    self.log.debug('Reset counter and launch function KeepAlive');
                     self.req_counter = 0;
                     const response = await axios({
                         url: 'https://www.riscocloud.com/ELAS/WebUI/Security/GetCPState?userIsAlive=true',
@@ -320,26 +328,39 @@ RiscoPanelSession.prototype = {
                         },
                         maxRedirects: 0,
                     });
+
                     if ( (response.headers['Location'] == '/ELAS/WebUI/UserLogin/SessionExpired') || (response.data.error == 3)) {
                         self.SessionLogged = false;
                         self.log.info('Session Expired. ReLogin');
                         await self.login();
                     } else if (response.status != 200) {
                         self.log.debug(response);
-                        throw new Error('Bad HTTP Response : ' + response.status);
+                        throw new Error('KeepAlive Bad HTTP Response : ' + response.status);
                     } else {
                         self.PolledData.CPState.lastPolled = Date.now();
                         self.PolledData.CPState.Data = response;
                     }
+                    if (response.data.overview !== null){
+                        self.log.debug('Status change since the last scan. Manual update of the values.');
+                        return response.data;
+                    } else {
+                        self.log.debug('Status not changed since the last scan.');
+                        return null;
+                    }
+                } else {
+                    return null;
                 }
+
             }
         } catch (err) {
-            self.log.error(err);
+            self.log.error('Error on KeepAlive: ' +err);
+            return null;
         }
     },
 
     async DiscoverParts() {
         var self = this;
+        self.log.debug('Entering DiscoverParts Function');
         try {
             await self.KeepAlive();
 
@@ -347,9 +368,11 @@ RiscoPanelSession.prototype = {
             var risco_Part_API_url;
 
             if (self.Partition == 'system'){
+                self.log.debug('Partition Mode Off');
                 SelfPolledData = self.PolledData.Overview;
                 risco_Part_API_url = 'https://www.riscocloud.com/ELAS/WebUI/Overview/Get';
             } else {
+                self.log.debug('Partition Mode On');
                 SelfPolledData = self.PolledData.Partitions;
                 risco_Part_API_url = 'https://www.riscocloud.com/ELAS/WebUI/Detectors/Get'
             }
@@ -388,7 +411,6 @@ RiscoPanelSession.prototype = {
                 var Parts_Datas = {};
 
                 if (self.Partition == 'system') {
-                    self.log.debug('Partition Mode Off');
                     Parts_Datas.type = 'system';
                     var Part_Data = {
                         id: 0,
@@ -414,7 +436,6 @@ RiscoPanelSession.prototype = {
                     Parts_Datas[0] = Part_Data;
                     Parts_Datas.type = 'system';
                 } else {
-                    self.log.debug('Partition Mode On');
                     for (var PartId in body.detectors.parts) {
                         var Part_Data = {
                             id: body.detectors.parts[PartId].id,
@@ -427,20 +448,23 @@ RiscoPanelSession.prototype = {
                             homeCommand: 'partially',
                             disarmCommand: 'disarmed'
                         };
+                        self.log.debug('Discovering Partition : ' + body.detectors.parts[PartId].name + ' with Id : ' + body.detectors.parts[PartId].id);
                         if (self.Partition == 'all') {
                             self.log.debug('All Partitions Required');
                             Part_Data.Required = true;
                         } else if (self.Partition != (self.Partition.split(',')) || ( parseInt(self.Partition) != NaN )){
+                            self.log.debug('Not All Partitions Required');
                             //Automatically convert string value to integer
                             const Required_Zones = self.Partition.split(',').map(function(item) {
                                 return parseInt(item, 10);
                             });
                             if (Required_Zones.includes(Part_Data.id) !== false){
+                                self.log.debug('Partitions "' + body.detectors.parts[PartId].name + '" Required');
                                 Part_Data.Required = true;
                             } else {
+                                self.log.debug('Partitions "' + body.detectors.parts[PartId].name + '" Not Required');
                                 Part_Data.Required = false;
                             }
-                            self.log.debug('Some Partitions Required');
                         } else {
                             self.log.debug('No Partitions Required');
                             Part_Data.Required = false;
@@ -795,76 +819,39 @@ RiscoPanelSession.prototype = {
         }
     },
 
-    async getPartsStates() {
+    async getPartsStates(body) {
         var self = this;
+        self.log.debug('Entering getPartStates function');
         try {
-            await self.KeepAlive();
-
-            var SelfPolledData;
-            var risco_Part_API_url;
-
             if (self.DiscoveredAccessories.partitions.type == 'system'){
-                SelfPolledData = self.PolledData.Overview;
-                risco_Part_API_url = 'https://www.riscocloud.com/ELAS/WebUI/Overview/Get';
+                self.log.debug('System Mode');
+                self.DiscoveredAccessories.partitions[0].previousState = self.DiscoveredAccessories.partitions[0].actualState;
+                self.DiscoveredAccessories.partitions[0].actualState = (function(){
+                    var armedZones = body.overview.partInfo.armedStr.split(' ');
+                    var partArmedZones = body.overview.partInfo.partarmedStr.split(' ');
+                    if (parseInt(armedZones[0]) > 0) {
+                        return 'armed';
+                    } else if (parseInt(partArmedZones[0]) > 0) {
+                        return 'partial';
+                    } else {
+                        return 'disarmed';
+                    }    
+                })();
+                self.log.debug('Previous State: ' + self.DiscoveredAccessories.partitions[0].previousState);
+                self.log.debug('Actual State: ' + self.DiscoveredAccessories.partitions[0].actualState);
             } else {
-                SelfPolledData = self.PolledData.Partitions;
-                risco_Part_API_url = 'https://www.riscocloud.com/ELAS/WebUI/Detectors/Get'
-            }
-            const Now = Date.now();
-            if  (!SelfPolledData.lastPolled) {
-                SelfPolledData.lastPolled = Now - (2*self.pollInterval);
-            }
-            const lastPolled_Diff = Now - SelfPolledData.lastPolled;
-            var response;
-            if ( lastPolled_Diff >= (self.pollInterval *0.8)) {
-                const post_data = {};
-                response = await axios({
-                    url: risco_Part_API_url,
-                    method: 'POST',
-                    headers: {
-                        Referer: 'https://www.riscocloud.com/ELAS/WebUI/MainPage/MainPage',
-                        Origin: 'https://www.riscocloud.com',
-                        Cookie: self.riscoCookies
-                    },
-                    data: {},
-
-                    validateStatus(status) {
-                        return status >= 200 && status < 400;
-                    },
-                    maxRedirects: 0,                        
-                });
-                SelfPolledData.lastPolled = Date.now();
-                SelfPolledData.Data = response;
-            } else {
-                response = SelfPolledData.Data;
-            }
-
-            if (response.status == 200) {
-                const body = response.data;
-                if (self.DiscoveredAccessories.partitions.type == 'system'){
-                    self.DiscoveredAccessories.partitions[0].previousState = self.DiscoveredAccessories.partitions[0].actualState;
-                    self.DiscoveredAccessories.partitions[0].actualState = (function(){
-                        var armedZones = body.overview.partInfo.armedStr.split(' ');
-                        var partArmedZones = body.overview.partInfo.partarmedStr.split(' ');
-                        if (parseInt(armedZones[0]) > 0) {
-                            return 'armed';
-                        } else if (parseInt(partArmedZones[0]) > 0) {
-                            return 'partial';
-                        } else {
-                            return 'disarmed';
-                        }    
-                    })();
-                } else {
-                    for (var PartId in body.detectors.parts) {
-                       const Id = body.detectors.parts[PartId].id;
-                       self.DiscoveredAccessories.partitions[Id].previousState = self.DiscoveredAccessories.partitions[Id].actualState;
-                       self.DiscoveredAccessories.partitions[Id].actualState = (body.detectors.parts[PartId].armIcon).match(/ico-(.*)\.png/)[1];
-                    }
+                self.log.debug('Partition Mode');
+                for (var PartId in body.detectors.parts) {
+                    const Id = body.detectors.parts[PartId].id;
+                    self.DiscoveredAccessories.partitions[Id].previousState = self.DiscoveredAccessories.partitions[Id].actualState;
+                    self.DiscoveredAccessories.partitions[Id].actualState = (body.detectors.parts[PartId].armIcon).match(/ico-(.*)\.png/)[1];
+                    self.log.debug('Partition Id: ' + Id + ' Label: ' + self.DiscoveredAccessories.partitions[Id].name)
+                    self.log.debug('Previous State: ' + self.DiscoveredAccessories.partitions[Id].previousState);
+                    self.log.debug('Actual State: ' + self.DiscoveredAccessories.partitions[Id].actualState);
                 }
-                return Promise.resolve();
-            } else {
-                throw new Error('Cannot Retrieve Partitions States');
             }
+            self.log.debug('Leaving getPartStates function');
+            return Promise.resolve();
         } catch (err) {
             self.log.error('Error on Get Partitions States : ' + err);
             return Promise.reject();
@@ -873,11 +860,54 @@ RiscoPanelSession.prototype = {
 
     async getCPStates() {
         var self = this;
-            
+        self.log.debug('Entering getCPStates function');
         try{
-            await self.KeepAlive();
-            if ((this.Partition || 'none') != 'none') {
-                await self.getPartsStates();
+            var body;
+            const KA_rslt = await self.KeepAlive();
+            if ( (self.Ready === true ) && ( self.SessionLogged)) {
+                self.log.debug('RiscoPanelSession is Ready');
+                if (KA_rslt === null){
+                    self.log.debug('KeepAlive does not signal a change or has not been tested.');
+                    const response = await axios({
+                        url: 'https://www.riscocloud.com/ELAS/WebUI/Security/GetCPState',
+                        method: 'POST',
+                        headers: {
+                            Referer: 'https://www.riscocloud.com/ELAS/WebUI/MainPage/MainPage',
+                            Origin: 'https://www.riscocloud.com',
+                            Cookie: self.riscoCookies
+                        },
+                        data: {},
+
+                        validateStatus(status) {
+                            return status >= 200 && status < 400;
+                        },
+                        maxRedirects: 0,                        
+                    });
+                    if (response.status == 200) {
+                        body = response.data;
+                    } else {
+                        throw new Error('Cannot Retrieve Partitions States');
+                    }
+                } else {
+                    self.log.debug('KeepAlive report a change. Using its result for status update.');
+                    body = KA_rslt;
+                }
+                self.UpdateCPStates(body);
+            } else {
+                self.log.debug('RiscoPanelSession is Not Ready');
+            }
+            return Promise.resolve(true);
+        } catch (err) {
+            return Promise.reject(err);
+        }
+    },
+
+    async UpdateCPStates(body) {
+        var self = this;
+        self.log.debug('Entering UpdateCPStates function');
+        try{
+            if (((this.Partition || 'none') != 'none') && (body.detectors != null)) {
+                await self.getPartsStates(body);
             }
             return Promise.resolve(true);
         } catch (err) {
@@ -886,8 +916,9 @@ RiscoPanelSession.prototype = {
     },
 
     async armDisarm(aState, cmd) {
+        //TODO : Add capability to restore exclude State
         var self = this;
-
+        self.log.debug('Entering armDisarm function');
         try {
             await self.KeepAlive();
 
@@ -895,9 +926,11 @@ RiscoPanelSession.prototype = {
             var targetPasscode;
             if (aState) {
                 // ARM
+                self.log.debug('Arming command: ' + targetType);
                 targetPasscode = "";
             } else {
                 // DISARM
+                self.log.debug('Disarming command: ' + targetType);
                 targetPasscode = "------"
             }
 
@@ -919,13 +952,21 @@ RiscoPanelSession.prototype = {
             });
 
             if (response.status == 200){
-                self.log.debug('armDisarm: ' + response.status);
-                return true;
+                if (response.data.armFailures !== null ){
+                    self.log.debug('armDisarm Not Ok. Using its result for status update');
+                    self.log.debug('errType: ' + response.data.armFailures.errType +' Reason: ' + response.data.armFailures.text);
+                    self.UpdateCPStates(response.data);
+                    return false;
+                } else {
+                    self.log.debug('armDisarm Ok. Using its result for status update');
+                    self.UpdateCPStates(response.data);
+                    return true;
+                }
             } else {
-                throw new Error('Bad HTTP Response : ' + response.status);
+                throw new Error('Bad HTTP Response: ' + response.status);
             }
         }catch(err){
-            self.log('armDisarm ' + err);
+            self.log('Error on armDisarm function: ' + err);
             return false;
         }
     }

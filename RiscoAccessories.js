@@ -63,7 +63,7 @@ function RiscoCPPartitions(log, accConfig, homebridge) {
         }, {
                 longpollEventName: self.long_event_name,
                 longpolling: true,
-                interval: self.pollInterval
+                interval: 1000
             });
 
         emitter.on(self.long_event_name, function (state) {
@@ -109,8 +109,7 @@ RiscoCPPartitions.prototype = {
 
     async setTargetState(state, callback) {
         var self = this;
-
-        self.log.debug('Setting %s state to %s', self.name, state);
+        self.log.debug('Setting "%s" state to (%s) -> %s', self.name, state, self.translateState(state));
         try{
             var riscoArm;
             var cmd;
@@ -125,6 +124,10 @@ RiscoCPPartitions.prototype = {
                 cmd_separator = '';
             }
 
+            if ((state != 3) && (self.riscoCurrentState != 3)) {
+                self.log.debug('The system is already armed and you want to change the arming type. It is necessary to disarm the system beforehand.');
+                await self.setTargetState(3, null);
+            }
             switch (state) {
                 case 0:
                     // stayArm = 0
@@ -154,13 +157,14 @@ RiscoCPPartitions.prototype = {
                 }
                 self.securityService.setCharacteristic(self.Characteristic.SecuritySystemCurrentState, state);
                 self.riscoCurrentState = state;
-                callback(null, self.riscoCurrentState);
+                typeof callback === 'function' && callback(null, self.riscoCurrentState);
             } else {
+                self.log.debug('Error on armDisarm!!! Maybe a sensor is active and system cannot be armed')
                 throw new Error('Error on armDisarm!!!');
             }
         } catch(err) {
             self.log.error(err);
-            callback(null, self.riscoCurrentState);
+            typeof callback === 'function' && callback(null, self.riscoCurrentState);
         }
     },
 
