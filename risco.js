@@ -25,45 +25,13 @@ function RiscoPanelSession(aConfig, aLog) {
     this.polling = aConfig['polling'] || false;
     this.pollInterval = aConfig['pollInterval'] || 30000;
     this.Partition = aConfig['Partition'];
-    this.Partition_Mode = aConfig['Partition_Mode']||false;
-    this.Partition_List = aConfig['Partition_List']||'0';
+    this.Groups = aConfig['Groups'];
     this.log = aLog;
     this.req_counter = 0;
     this.riscoCookies;
     this.SessionLogged = false;
-    this.PolledData={
-        Output: {
-            lastPolled: null,
-            Data: null
-        },
-        Partitions: {
-            lastPolled: null,
-            Data: null
-        },
-        Groups: {
-            lastPolled: null,
-            Data: null
-        },
-        Detectors: {
-            lastPolled: null,
-            Data: null
-        },
-        Cameras: {
-            lastPolled: null,
-            Data: null
-        },
-        Overview: {
-            lastPolled: null,
-            Data: null            
-        },
-        CPState: {
-            lastPolled: null,
-            Data: null            
-        },
-    };
 
     this.long_event_name = 'RPS_long_' + (this.risco_panel_name.toLowerCase()).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ /g, '_');
-
 
     var self = this;
 
@@ -336,9 +304,6 @@ RiscoPanelSession.prototype = {
                     } else if (response.status != 200) {
                         self.log.debug(response);
                         throw new Error('KeepAlive Bad HTTP Response : ' + response.status);
-                    } else {
-                        self.PolledData.CPState.lastPolled = Date.now();
-                        self.PolledData.CPState.Data = response;
                     }
                     if (response.data.overview !== null){
                         self.log.debug('Status change since the last scan. Manual update of the values.');
@@ -364,16 +329,13 @@ RiscoPanelSession.prototype = {
         try {
             await self.KeepAlive();
 
-            var SelfPolledData;
             var risco_Part_API_url;
 
             if (self.Partition == 'system'){
                 self.log.debug('Partition Mode Off');
-                SelfPolledData = self.PolledData.Overview;
                 risco_Part_API_url = 'https://www.riscocloud.com/ELAS/WebUI/Overview/Get';
             } else {
                 self.log.debug('Partition Mode On');
-                SelfPolledData = self.PolledData.Partitions;
                 risco_Part_API_url = 'https://www.riscocloud.com/ELAS/WebUI/Detectors/Get'
             }
 
@@ -394,14 +356,6 @@ RiscoPanelSession.prototype = {
                 },
                 maxRedirects: 0,                        
             });
-            SelfPolledData.lastPolled = Date.now();
-            SelfPolledData.Data = response;
-
-            var DiscoveredPartitions = {
-                type: null,
-                required: null,
-                value: null
-            };
 
             if (response.status == 200) {
 
@@ -441,6 +395,7 @@ RiscoPanelSession.prototype = {
                             id: body.detectors.parts[PartId].id,
                             name: body.detectors.parts[PartId].name,
                             Required: null,
+                            ExitDelay: 0,
                             previousState: null,
                             actualState: (body.detectors.parts[PartId].armIcon).match(/ico-(.*)\.png/)[1],
                             armCommand: 'armed',
@@ -488,33 +443,22 @@ RiscoPanelSession.prototype = {
         try {
             await self.KeepAlive();
 
-            const Now = Date.now();
-            if  (!self.PolledData.Groups.lastPolled) {
-                self.PolledData.Groups.lastPolled = Now - (2*self.pollInterval);
-            }
-            const lastPolled_Diff = Now - self.PolledData.Groups.lastPolled;
             var response;
-            if ( lastPolled_Diff >= self.pollInterval ){
+            response = await axios({
+                url: 'https://www.riscocloud.com/ELAS/WebUI/MainPage/MainPage',
+                method: 'GET',
+                headers: {
+                    Referer: 'https://www.riscocloud.com/ELAS/WebUI/MainPage/MainPage',
+                    Origin: 'https://www.riscocloud.com',
+                    Cookie: self.riscoCookies
+                },
 
-                response = await axios({
-                    url: 'https://www.riscocloud.com/ELAS/WebUI/MainPage/MainPage',
-                    method: 'GET',
-                    headers: {
-                        Referer: 'https://www.riscocloud.com/ELAS/WebUI/MainPage/MainPage',
-                        Origin: 'https://www.riscocloud.com',
-                        Cookie: self.riscoCookies
-                    },
+                validateStatus(status) {
+                    return status >= 200 && status < 400;
+                },
+                maxRedirects: 0,                        
+            });
 
-                    validateStatus(status) {
-                        return status >= 200 && status < 400;
-                    },
-                    maxRedirects: 0,                        
-                });  
-                self.PolledData.Groups.lastPolled = Date.now();
-            } else {
-                response = self.PolledData.Groups.Data;
-            }
-            
             if (response.status == 200){
                 self.log.debug('Groups Status: ' + response.status);
                 var GroupInfo = (function() { 
@@ -522,15 +466,31 @@ RiscoPanelSession.prototype = {
                     self.log.debug('Groups => HTML Output Info start at : ' + GroupInfo_begin);
                     var GroupInfo_end = response.data.indexOf('</section>', GroupInfo_begin);
                     self.log.debug('Groups => HTML Output Info finish at : ' + GroupInfo_end);
-                    //var Groups_list = response.data.substring(GroupInfo_begin , GroupInfo_end - 11).match(/<label for="actGrpItem\d">.*?<\/label>/gs);
                     var Groups_list = response.data.substring(GroupInfo_begin , GroupInfo_end - 11).match(/<label for="actGrpItem\d">.*?<\/div>/gs);
-                    self.log.info('Discovered '+ Groups_list.length + ' Group');
+                    self.log.info('Discovered '+ Groups_list.length + ' Groups');
+                    
                     var Groups_Datas = {};
+                    var ParentPartList = response.data.match(/<label data-groups=".*">.*<.*OpenPartGroups.*?\)\'/gm);
+
                     for (var Group in Groups_list){
+                        var GroupName = Groups_list[Group].match(/<label for="actGrpItem\d">(.*?)<\/label>/s)[1];
                         var Group_Data = {
-                            id: Groups_list[Group].match(/<label for="actGrpItem(\d)">/s)[1],
-                            name: Groups_list[Group].match(/<label for="actGrpItem\d">(.*?)<\/label>/s)[1],
-                            status: (function() {
+                            id: parseInt(Groups_list[Group].match(/<label for="actGrpItem(\d)">/s)[1], 10),
+                            name: 'Group ' + GroupName,
+                            parentPart: (function(){
+                                var resultArray = [];
+                                self.log('parentpart');
+                                for (var ParentPart in ParentPartList) {
+                                    var ParentPartId = ParentPartList[ParentPart].match(new RegExp('<label data-groups=".*?' + GroupName+ '.*?">.*<.*OpenPartGroups\\("(\\d*?)"','gm'));
+                                    if (ParentPartId != null ){
+                                        resultArray.push((''+ParentPartId).match(/"(\d*?)"$/s)[1]);
+                                    }
+                                }
+                                return resultArray;
+                            })(),
+                            Required: null,
+                            previousState: null,
+                            actualState: (function() {
                                 var result_State = 'Disarmed';
                                     var Group_Status = Groups_list[Group].match(/<span.*?area\s.*?">.*?input.*?"radio"\s.*?\s?name=.*?>/gs);
                                     for (var Status in Group_Status){
@@ -542,12 +502,26 @@ RiscoPanelSession.prototype = {
                                     return result_State;
                                 })(),
                         };
+                        self.log.debug('Discovering Group : "' + Group_Data.name + '" with Id : ' + Group_Data.id);
+                        if (self.Groups == 'all') {
+                            self.log.debug('All Groups Required');
+                            Group_Data.Required = true;
+                        } else if (self.Groups != (self.Groups.split(',')) || ( parseInt(self.Groups) != NaN )){
+                            self.log.debug('Not All Groups Required');
+                            //Automatically convert string value to integer
+                            const Required_Groups = self.Groups.split(',').map(function(item) {
+                                return parseInt(item, 10);
+                            });
+                            if (Required_Groups.includes(Group_Data.id) !== false){
+                                self.log.debug('Group "' + Group_Data.name + '" Required');
+                                Group_Data.Required = true;
+                            } else {
+                                self.log.debug('Group "' + Group_Data.name + '" Not Required');
+                                Group_Data.Required = false;
+                            }
+                        }
 
-                        self.log.debug('name : ' + Group_Data.name);
-                        self.log.debug('Id : ' + Group_Data.id);
-                        self.log.debug('status  : ' + Group_Data.status);
                         Groups_Datas[Group_Data.id] = Group_Data;
-                        self.log.info(JSON.stringify(Group_Data));
                     }
                     self.log.debug(JSON.stringify(Groups_Datas));
                     return Groups_Datas;
@@ -566,32 +540,21 @@ RiscoPanelSession.prototype = {
       
         try {
             await self.KeepAlive();
-
-            const Now = Date.now();
-            if  (!self.PolledData.Outputs.lastPolled) {
-                self.PolledData.Outputs.lastPolled = Now - (2*self.pollInterval);
-            }
-            const lastPolled_Diff = Now - self.PolledData.Outputs.lastPolled;
             var response;
-            if ( lastPolled_Diff >= self.pollInterval ){
-                response = await axios({
-                    url: 'https://www.riscocloud.com/ELAS/WebUI/MainPage/MainPage',
-                    method: 'GET',
-                    headers: {
-                        Referer: 'https://www.riscocloud.com/ELAS/WebUI/MainPage/MainPage',
-                        Origin: 'https://www.riscocloud.com',
-                        Cookie: self.riscoCookies
-                    },
+            response = await axios({
+                url: 'https://www.riscocloud.com/ELAS/WebUI/MainPage/MainPage',
+                method: 'GET',
+                headers: {
+                    Referer: 'https://www.riscocloud.com/ELAS/WebUI/MainPage/MainPage',
+                    Origin: 'https://www.riscocloud.com',
+                    Cookie: self.riscoCookies
+                },
 
-                    validateStatus(status) {
-                        return status >= 200 && status < 400;
-                    },
-                    maxRedirects: 0,                        
-                }); 
-                self.PolledData.Outputs.lastPolled = Date.now();
-            } else {
-                response = self.PolledData.Outputs.Data;
-            }
+                validateStatus(status) {
+                    return status >= 200 && status < 400;
+                },
+                maxRedirects: 0,                        
+            }); 
 
             if (response.status == 200){
                 var OutputInfo = (function() { 
@@ -650,31 +613,21 @@ RiscoPanelSession.prototype = {
         try {
             await self.KeepAlive();
 
-            const Now = Date.now();
-            if  (!self.PolledData.Detectors.lastPolled) {
-                self.PolledData.Detectors.lastPolled = Now - (2*self.pollInterval);
-            }
-            const lastPolled_Diff = Now - self.PolledData.Detectors.lastPolled;
             var response;
-            if ( lastPolled_Diff >= self.pollInterval ){
-                response = await axios({
-                    url: 'https://www.riscocloud.com/ELAS/WebUI/Detectors/Get',
-                    method: 'POST',
-                    headers: {
-                        Referer: 'https://www.riscocloud.com/ELAS/WebUI/MainPage/MainPage',
-                        Origin: 'https://www.riscocloud.com',
-                        Cookie: self.riscoCookies
-                    },
+            response = await axios({
+                url: 'https://www.riscocloud.com/ELAS/WebUI/Detectors/Get',
+                method: 'POST',
+                headers: {
+                    Referer: 'https://www.riscocloud.com/ELAS/WebUI/MainPage/MainPage',
+                    Origin: 'https://www.riscocloud.com',
+                    Cookie: self.riscoCookies
+                },
 
-                    validateStatus(status) {
-                        return status >= 200 && status < 400;
-                    },
-                    maxRedirects: 0,                        
-                }); 
-                self.PolledData.Partitions.lastPolled = Date.now();
-            } else {
-                response = self.PolledData.Detectors.Data;
-            }
+                validateStatus(status) {
+                    return status >= 200 && status < 400;
+                },
+                maxRedirects: 0,                        
+            }); 
 
             if (response.status == 200){
                 self.log.debug('Detectors/Get status: ' + response.status);
@@ -717,31 +670,21 @@ RiscoPanelSession.prototype = {
         try {
             await self.KeepAlive();
 
-            const Now = Date.now();
-            if  (!self.PolledData.Cameras.lastPolled) {
-                self.PolledData.Cameras.lastPolled = Now - (2*self.pollInterval);
-            }
-            const lastPolled_Diff = Now - self.PolledData.Cameras.lastPolled;
             var response;
-            if ( lastPolled_Diff >= self.pollInterval ){
-                response = await axios({
-                    url: 'https://www.riscocloud.com/ELAS/WebUI/Cameras/Get',
-                    method: 'POST',
-                    headers: {
-                        Referer: 'https://www.riscocloud.com/ELAS/WebUI/MainPage/MainPage',
-                        Origin: 'https://www.riscocloud.com',
-                        Cookie: self.riscoCookies
-                    },
+            response = await axios({
+                url: 'https://www.riscocloud.com/ELAS/WebUI/Cameras/Get',
+                method: 'POST',
+                headers: {
+                    Referer: 'https://www.riscocloud.com/ELAS/WebUI/MainPage/MainPage',
+                    Origin: 'https://www.riscocloud.com',
+                    Cookie: self.riscoCookies
+                },
 
-                    validateStatus(status) {
-                        return status >= 200 && status < 400;
-                    },
-                    maxRedirects: 0,                        
-                });            
-                self.PolledData.Cameras.lastPolled = Date.now();
-            } else {
-                response = self.PolledData.Cameras.Data;
-            }
+                validateStatus(status) {
+                    return status >= 200 && status < 400;
+                },
+                maxRedirects: 0,
+            });            
 
             if (response.status == 200){
                 self.log.debug('Cameras/Get status: ' + response.status);
@@ -770,55 +713,6 @@ RiscoPanelSession.prototype = {
         }
     },
 
-    async getOverview() {
-        var self = this;
-        try {
-            await self.KeepAlive();
-
-            const Now = Date.now();
-            if  (!self.PolledData.Overview.lastPolled) {
-                self.PolledData.Overview.lastPolled = Now - (2*self.pollInterval);
-            }
-            const lastPolled_Diff = Now - self.PolledData.Overview.lastPolled;
-            var response;
-            if ( lastPolled_Diff >= (self.pollInterval *0.8)) {
-                const post_data = {};
-                response = await axios({
-                    url: 'https://www.riscocloud.com/ELAS/WebUI/Overview/Get',
-                    method: 'POST',
-                    headers: {
-                        Referer: 'https://www.riscocloud.com/ELAS/WebUI/MainPage/MainPage',
-                        Origin: 'https://www.riscocloud.com',
-                        Cookie: self.riscoCookies
-                    },
-                    data: {},
-
-                    validateStatus(status) {
-                        return status >= 200 && status < 400;
-                    },
-                    maxRedirects: 0,                        
-                });
-                self.PolledData.Overview.lastPolled = Date.now();
-                self.PolledData.Overview.Data = response;
-            } else {
-                response = self.PolledData.Partitions.Data;
-            }
-
-            if (response.status == 200) {
-                const body = response.data;
-                for (var PartId in body.detectors.parts) {
-                    const Id = body.detectors.parts[PartId].id
-                    self.DiscoveredAccessories.partitions[Id].previousState = self.DiscoveredAccessories.partitions[Id].actualState;
-                    self.DiscoveredAccessories.partitions[Id].actualState = (body.detectors.parts[PartId].armIcon).match(/ico-(.*)\.png/)[1];
-                }
-            } else {
-                throw new Error('Cannot Retrieve Partitions States');
-            }
-        } catch (err) {
-            self.log.error('Error on Get Partitions States : ' + err);
-        }
-    },
-
     async getPartsStates(body) {
         var self = this;
         self.log.debug('Entering getPartStates function');
@@ -839,21 +733,59 @@ RiscoPanelSession.prototype = {
                 })();
                 self.log.debug('Previous State: ' + self.DiscoveredAccessories.partitions[0].previousState);
                 self.log.debug('Actual State: ' + self.DiscoveredAccessories.partitions[0].actualState);
+                if (Math.max(body.ExitDelayTimeout) != 0){
+                    self.DiscoveredAccessories.partitions[Id].ExitDelay = Math.max(body.ExitDelayTimeout);
+                    self.log.debug('Arming Delay Left: ' + self.DiscoveredAccessories.partitions[Id].ExitDelay);
+                }
             } else {
                 self.log.debug('Partition Mode');
-                for (var PartId in body.detectors.parts) {
-                    const Id = body.detectors.parts[PartId].id;
-                    self.DiscoveredAccessories.partitions[Id].previousState = self.DiscoveredAccessories.partitions[Id].actualState;
-                    self.DiscoveredAccessories.partitions[Id].actualState = (body.detectors.parts[PartId].armIcon).match(/ico-(.*)\.png/)[1];
-                    self.log.debug('Partition Id: ' + Id + ' Label: ' + self.DiscoveredAccessories.partitions[Id].name)
-                    self.log.debug('Previous State: ' + self.DiscoveredAccessories.partitions[Id].previousState);
-                    self.log.debug('Actual State: ' + self.DiscoveredAccessories.partitions[Id].actualState);
+                if (Math.max(body.ExitDelayTimeout) != 0){
+                    for (var PartId in body.ExitDelayTimeout){
+                       if (body.ExitDelayTimeout[PartId] != 0){
+                            self.DiscoveredAccessories.partitions[PartId].ExitDelay = body.ExitDelayTimeout[PartId];
+                            self.log.debug('Arming Delay Left for Part "' + self.DiscoveredAccessories.partitions[PartId].name + '": ' + self.DiscoveredAccessories.partitions[PartId].ExitDelay);
+                        }
+                    }
+                }
+                if (body.detectors != null) {
+                    for (var PartId in body.detectors.parts) {
+                       const Id = body.detectors.parts[PartId].id;
+                       self.DiscoveredAccessories.partitions[Id].previousState = self.DiscoveredAccessories.partitions[Id].actualState;
+                       self.DiscoveredAccessories.partitions[Id].actualState = (body.detectors.parts[PartId].armIcon).match(/ico-(.*)\.png/)[1];
+                        self.log.debug('Partition Id: ' + Id + ' Label: ' + self.DiscoveredAccessories.partitions[Id].name)
+                        self.log.debug('Previous State: ' + self.DiscoveredAccessories.partitions[Id].previousState);
+                        self.log.debug('Actual State: ' + self.DiscoveredAccessories.partitions[Id].actualState);
+                    }
                 }
             }
             self.log.debug('Leaving getPartStates function');
             return Promise.resolve();
         } catch (err) {
             self.log.error('Error on Get Partitions States : ' + err);
+            return Promise.reject();
+        }
+    },
+
+    async getGroupsStates(body) {
+        var self = this;
+        self.log.debug('Entering getGroupsStates function');
+        try {
+            for (var GroupId in body.allGrpState.GlobalState) {
+                    const Id = body.allGrpState.GlobalState[GroupId].Id;
+                    self.DiscoveredAccessories.Groups[Id].previousState = self.DiscoveredAccessories.Groups[Id].actualState;
+                    self.DiscoveredAccessories.Groups[Id].actualState = (function(){
+                            self.log.debug('Group Armed State? ' + body.allGrpState.GlobalState[GroupId].Armed);
+                            self.log.debug(body.allGrpState.GlobalState);
+                            return ((body.allGrpState.GlobalState[GroupId].Armed != false)?'armed':'disarmed');
+                        })();
+                    self.log.debug('Group Id: ' + Id + ' Label: ' + self.DiscoveredAccessories.Groups[Id].name)
+                    self.log.debug('Previous State: ' + self.DiscoveredAccessories.Groups[Id].previousState);
+                    self.log.debug('Actual State: ' + self.DiscoveredAccessories.Groups[Id].actualState);
+                }
+            self.log.debug('Leaving getGroupsStates function');
+            return Promise.resolve();
+        } catch (err) {
+            self.log.error('Error on getGroupsStates : ' + err);
             return Promise.reject();
         }
     },
@@ -906,8 +838,11 @@ RiscoPanelSession.prototype = {
         var self = this;
         self.log.debug('Entering UpdateCPStates function');
         try{
-            if (((this.Partition || 'none') != 'none') && (body.detectors != null)) {
+            if (((this.Partition || 'none') != 'none') && ((body.detectors != null) || (Math.max(body.ExitDelayTimeout) != 0 ))) {
                 await self.getPartsStates(body);
+            }
+            if (((this.Groups || 'none') != 'none') && (body.allGrpState != null)){
+                await self.getGroupsStates(body);
             }
             return Promise.resolve(true);
         } catch (err) {
@@ -929,8 +864,8 @@ RiscoPanelSession.prototype = {
                 self.log.debug('Arming command: ' + targetType);
                 targetPasscode = "";
             } else {
-                // DISARM
-                self.log.debug('Disarming command: ' + targetType);
+                // DISARM or Refresh
+                self.log.debug('Disarming or Refreshing command: ' + targetType);
                 targetPasscode = "------"
             }
 
@@ -953,21 +888,29 @@ RiscoPanelSession.prototype = {
 
             if (response.status == 200){
                 if (response.data.armFailures !== null ){
-                    self.log.debug('armDisarm Not Ok. Using its result for status update');
+                    self.log.debug('armDisarm Not Ok. Using this result for status update');
                     self.log.debug('errType: ' + response.data.armFailures.errType +' Reason: ' + response.data.armFailures.text);
+                    //Todo :
+                    // return more info
                     self.UpdateCPStates(response.data);
-                    return false;
+                    return [0, NaN];
                 } else {
-                    self.log.debug('armDisarm Ok. Using its result for status update');
-                    self.UpdateCPStates(response.data);
-                    return true;
+                    if ((parseInt(response.data.ExitDelayTimeout) != 0)) {
+                        self.log.debug('armDisarm Ok. Timed arming in progress');
+                        return [2, (( parseInt(response.data.ExitDelayTimeout) + 2 )*1000)];
+                    } else {
+                        self.log.debug('armDisarm Ok. Using this result for status update');
+                        self.UpdateCPStates(response.data);
+                        return [1, NaN];
+                    }
                 }
+
             } else {
                 throw new Error('Bad HTTP Response: ' + response.status);
             }
         }catch(err){
             self.log('Error on armDisarm function: ' + err);
-            return false;
+            return [0, NaN];
         }
     }
 }

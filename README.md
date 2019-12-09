@@ -29,6 +29,7 @@ Configuration sample:
             "polling": true | false,
             "pollInterval": 10000,
             "Partition": "all|none|system|0,1,2,....",
+            "Groups": "all|none|0,1,2,....",
         }
     ]
 ```
@@ -49,6 +50,11 @@ Fields:
     * "system": will generate an accessory for global system
     * "0,1,...": will generate an accessory for each listed partition.
         Accepts a comma-separated list of strin where each member is the id of a partition
+* "Groups" => optional: accept the following options
+    * "none": will not generate an accessory for Groups
+    * "all": will generate an accessory for each Group
+    * "0,1,...": will generate an accessory for each listed Groups.
+        Accepts a comma-separated list of strin where each member is the id of a Group
 
 If no accessory is generated, the system mode operation will be set by default.
 
@@ -78,7 +84,6 @@ TODO:
 * Add the ability to set the arming / partial / night / disarm commands
 * Allow the ability to monitor panels from multiple sites (only from the same RiscoCloud account) - requires modification of 'app.js' and 'risco.js'
 * Edit the RiscoAccessories file to simplify the declaration of accessories using a common trunk to all accessories
-* Add Groups (Partially done)
 * Add Detectors (Partially done)
 * Add Outputs (Partially done)
 * Add Cameras (Partially done but may not be usable)

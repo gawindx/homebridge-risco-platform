@@ -9,7 +9,8 @@
             "riscoPassword": "",
             "riscoSiteId": 12345,
             "riscoPIN": "",
-            "Partition": "none|all|system|0,1,.."
+            "Partition": "none|all|system|0,1,..",
+            "Groups": "all|none|0,1,2,....",
         }
     ]
 }

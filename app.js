@@ -36,7 +36,7 @@ RiscoPanelPlatform.prototype = {
                 }
                 if ((self.config['Groups'] || 'none') != 'none') {
                     self.log.debug('Discovering Groups');
-                    DiscoveredAccessories.groups = await self.RiscoPanel.DiscoverGroups();
+                    DiscoveredAccessories.Groups = await self.RiscoPanel.DiscoverGroups();
                 }
                 if ((self.config['Outputs'] || 'none') != 'none') {
                     self.log.debug('Discovering Outputs');
@@ -65,42 +65,73 @@ RiscoPanelPlatform.prototype = {
             self.RiscoPanel.DiscoveredAccessories = DiscoveredAccessories;
             self.log.info('AddAccessory Phase Started');
             var Devices = [];
-            //accessorytype can be 'system' if DiscoveredAccessories.partitions.type == 'system'
-            if ( DiscoveredAccessories.partitions.type == 'system'){
-                self.log.info('Create Accessory for System : ' + DiscoveredAccessories.partitions[0].name);
-                var PartConfig = {
-                    config: DiscoveredAccessories.partitions[0],
-                    RiscoSession: self.RiscoPanel,
-                    accessorytype: 'system',
-                    polling: self.config["polling"],
-                    pollInterval: self.config["pollInterval"]
-                };
-                Devices.push(PartConfig);
-            } else {
-                for (var PartsId in DiscoveredAccessories.partitions) {
-                    if (PartsId != 'type'){
-                        if (DiscoveredAccessories.partitions[PartsId].Required == true ) {
-                            self.log.info('Create Accessory for Partitions Id : ' + DiscoveredAccessories.partitions[PartsId].id + ' and labeled ' + DiscoveredAccessories.partitions[PartsId].name);
+            for (var DeviceFamily in DiscoveredAccessories){
+                switch (DeviceFamily){
+                    case 'partitions':
+                        if ( DiscoveredAccessories.partitions.type == 'system'){
+                            self.log.info('Create Accessory for System : ' + DiscoveredAccessories.partitions[0].name);
                             var PartConfig = {
-                                config: DiscoveredAccessories.partitions[PartsId],
+                                config: DiscoveredAccessories.partitions[0],
                                 RiscoSession: self.RiscoPanel,
-                                accessorytype: 'partition',
-                                polling: self.config["polling"],
-                                pollInterval: self.config["pollInterval"]
+                                accessorytype: 'system',
+                                polling: self.config['polling'],
+                                pollInterval: self.config['pollInterval']
                             };
                             Devices.push(PartConfig);
+                        } else {
+                            for (var PartsId in DiscoveredAccessories.partitions) {
+                                if (PartsId != 'type'){
+                                    if (DiscoveredAccessories.partitions[PartsId].Required == true ) {
+                                        self.log.info('Create Accessory for Partitions Id : ' + DiscoveredAccessories.partitions[PartsId].id + ' and labeled "' + DiscoveredAccessories.partitions[PartsId].name +'"');
+                                        var PartConfig = {
+                                            config: DiscoveredAccessories.partitions[PartsId],
+                                            RiscoSession: self.RiscoPanel,
+                                            accessorytype: 'partition',
+                                            polling: self.config['polling'],
+                                            pollInterval: self.config['pollInterval']
+                                        };
+                                        Devices.push(PartConfig);
+                                    }
+                                }
+                            }
                         }
-                    }
-                }
+                        break;
+                    case 'Groups':
+                        for (var GroupsId in DiscoveredAccessories.Groups) {
+                            if (GroupsId != 'type'){
+                                if (DiscoveredAccessories.Groups[GroupsId].Required == true ) {
+                                    self.log.info('Create Accessory for Groups Id : ' + DiscoveredAccessories.Groups[GroupsId].id + ' and labeled "' + DiscoveredAccessories.Groups[GroupsId].name + '"');
+                                    var GroupConfig = {
+                                        config: DiscoveredAccessories.Groups[GroupsId],
+                                        RiscoSession: self.RiscoPanel,
+                                        accessorytype: 'group',
+                                        polling: self.config['polling'],
+                                        pollInterval: self.config['pollInterval']
+                                    };
+                                    Devices.push(GroupConfig);
+                                }
+                            }
+                        }
+                        break;
+                };
             }
-            self.log.debug('Devices: ' + Devices);
+            self.log.info('All Devices Identified');
+            self.log.debug('Devices: ' + JSON.stringify(Devices));
             const foundAccessories = (function(){
-                var validDevices = Devices.filter(device => device.accessorytype.toLowerCase());
-                return validDevices.map(device => (function(){
+                var AllAccessories = [];
+                Array.prototype.push.apply(AllAccessories, Devices.filter(device => device.accessorytype.toLowerCase() == 'partition')
+                    .map(device => (function(){
                     self.log.debug('Create Accessory for device:', device);
                     return new riscoAccessory.RiscoCPPartitions(self.log, device, global.homebridge);
-                })());
+                })()));
+                Array.prototype.push.apply(AllAccessories, Devices.filter(device => device.accessorytype.toLowerCase() == 'group')
+                    .map(device => (function(){
+                    self.log.debug('Create Accessory for device:', device);
+                    return new riscoAccessory.RiscoCPGroups(self.log, device, global.homebridge);
+                })()));
+                return AllAccessories;
             })();
+            self.log.info('All Accessory Created');
             self.RiscoPanel.Ready = true;
             callback(foundAccessories);
         } catch (err){

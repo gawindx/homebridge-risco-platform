@@ -3,13 +3,21 @@ var pjson = require('./package.json');
 var waitUntil = require('wait-until');
 var pollingtoevent = require('polling-to-event');
 
-module.exports.RiscoCPPartitions = RiscoCPPartitions;
+module.exports = {
+    RiscoCPPartitions: RiscoCPPartitions,
+    RiscoCPGroups: RiscoCPGroups
+}
 
-function RiscoCPPartitions(log, accConfig, homebridge) {
+function RiscoCPGroups(log, accConfig, homebridge) {
+    return new RiscoCPPartitions(log, accConfig, homebridge, 'group');
+}
+
+function RiscoCPPartitions(log, accConfig, homebridge, TypeOfAcc ='partition') {
 
     this.log = log;
     this.name = accConfig.config.name;
     this.RiscoSession = accConfig.RiscoSession;
+    this.TypeOfAcc = TypeOfAcc;
     this.RiscoPartId = (function(){
         if (accConfig.accessorytype == 'system'){
             return null;
@@ -116,55 +124,116 @@ RiscoCPPartitions.prototype = {
 
             var PartId;
             var cmd_separator;
-            if (self.RiscoPartId != null ){
-                PartId = self.RiscoPartId;
-                cmd_separator = ':';
-            } else {
-                PartId = 0;
-                cmd_separator = '';
-            }
+            var CmdList = [];
+            var ArmResp;
 
-            if ((state != 3) && (self.riscoCurrentState != 3)) {
-                self.log.debug('The system is already armed and you want to change the arming type. It is necessary to disarm the system beforehand.');
-                await self.setTargetState(3, null);
-            }
-            switch (state) {
-                case 0:
-                    // stayArm = 0
-                    riscoArm = true;
-                    cmd = (self.RiscoPartId | '') + cmd_separator + self.RiscoSession.DiscoveredAccessories.partitions[PartId].homeCommand;
-                    break;
-                case 1:
-                    // stayArm = 1
-                    riscoArm = true;
-                    cmd = (self.RiscoPartId | '') + cmd_separator + self.RiscoSession.DiscoveredAccessories.partitions[PartId].armCommand;
-                    break;
-                case 2:
-                    // stayArm = 2
-                    riscoArm = true;
-                    cmd = (self.RiscoPartId | '') + cmd_separator + self.RiscoSession.DiscoveredAccessories.partitions[PartId].nightCommand;
-                    break;
-                case 3:
-                    // stayArm = 3
-                    riscoArm = false
-                    cmd = (self.RiscoPartId | '') + cmd_separator + self.RiscoSession.DiscoveredAccessories.partitions[PartId].disarmCommand;
-                    break;
-            };
-            const ArmResp = await self.RiscoSession.armDisarm(riscoArm, cmd);
-            if (ArmResp){
-                if (!self.polling){
-                    self.log.info('Partition "' + self.name + '" => Set new state: (' + state + ') -> ' + self.translateState(state));
+            if (self.TypeOfAcc == 'group'){
+                self.log.debug('RiscoAcc Grp');
+                self.log.debug('Actual state: ' + self.riscoCurrentState);
+                self.log.debug('Futur state: ' + state);
+                if ((state == 3) && (self.riscoCurrentState != 3)) {
+                    self.log.debug('The system is armed and you want to disarm. Because RiscoCloud can not afford it, it is necessary to disarm the parent(s) partition.');
+                    self.log.debug('All other child groups in this partition will also be disarmed.');
+                    self.log(JSON.stringify(self.RiscoSession.DiscoveredAccessories.Groups));
+                    self.log.debug('Parent Part of ' + (self.RiscoPartId || 'null') + ': '+ JSON.stringify((self.RiscoSession.DiscoveredAccessories.Groups[self.RiscoPartId]).parentPart));
+                    for (var ParentPart in self.RiscoSession.DiscoveredAccessories.Groups[self.RiscoPartId].parentPart) {
+                        self.log.debug('Add Cmd: ' + self.RiscoSession.DiscoveredAccessories.Groups[self.RiscoPartId].parentPart[ParentPart] + ':' + 'disarmed');
+                        CmdList.push([false, self.RiscoSession.DiscoveredAccessories.Groups[self.RiscoPartId].parentPart[ParentPart] + ':' + 'disarmed']);
+                    }
+                } else {
+                    self.log.debug('Add Cmd: ' + 'G' + self.RiscoPartId + ':' + 'armed');
+                    CmdList.push([true,'G' + self.RiscoPartId + ':' + 'armed']);
                 }
-                self.securityService.setCharacteristic(self.Characteristic.SecuritySystemCurrentState, state);
-                self.riscoCurrentState = state;
-                typeof callback === 'function' && callback(null, self.riscoCurrentState);
+                for (var GrpCmd in CmdList){
+                    //Todo
+                    // get more data for best use
+                    ArmResp = await self.RiscoSession.armDisarm(CmdList[GrpCmd][0], CmdList[GrpCmd][1], self.name);
+                    if (ArmResp){
+                        if (!self.polling){
+                            self.log.info('Group "' + self.name + '" => Set new state: (' + state + ') -> ' + self.translateState(state));
+                        }
+                        self.securityService.setCharacteristic(self.Characteristic.SecuritySystemCurrentState, state);
+                        self.riscoCurrentState = state;
+                        typeof callback === 'function' && callback(null, self.riscoCurrentState);
+                    } else {
+                        //treat case when parentPart of group is already armed
+                        self.log.debug('Error on armDisarm!!! Maybe a sensor is active and system cannot be armed')
+                        throw new Error('Error on armDisarm!!!');
+                    }
+                }
             } else {
-                self.log.debug('Error on armDisarm!!! Maybe a sensor is active and system cannot be armed')
-                throw new Error('Error on armDisarm!!!');
+                if (self.RiscoPartId != null ){
+                    PartId = self.RiscoPartId;
+                    cmd_separator = ':';
+                } else {
+                    PartId = 0;
+                    cmd_separator = '';
+                }
+                if ((state != 3) && (self.riscoCurrentState != 3)) {
+                    self.log.debug('The system is already armed and you want to change the arming type. It is necessary to disarm the system beforehand.');
+                    await self.setTargetState(3, null);
+                }
+                switch (state) {
+                    case 0:
+                        // Stay_Arm = 0
+                        riscoArm = true;
+                        cmd = (self.RiscoPartId | '') + cmd_separator + self.RiscoSession.DiscoveredAccessories.partitions[PartId].homeCommand;
+                        break;
+                    case 1:
+                        // Away_Arm = 1
+                        riscoArm = true;
+                        cmd = (self.RiscoPartId | '') + cmd_separator + self.RiscoSession.DiscoveredAccessories.partitions[PartId].armCommand;
+                        break;
+                    case 2:
+                        // Night_Arm = 2
+                        riscoArm = true;
+                        cmd = (self.RiscoPartId | '') + cmd_separator + self.RiscoSession.DiscoveredAccessories.partitions[PartId].nightCommand;
+                        break;
+                    case 3:
+                        // Disarm = 3
+                        riscoArm = false
+                        cmd = (self.RiscoPartId | '') + cmd_separator + self.RiscoSession.DiscoveredAccessories.partitions[PartId].disarmCommand;
+                        break;
+                };
+                
+                const [error, newState] = await self.GetSetArmState(self, riscoArm, cmd, state);
+                if (error !== null) {
+                    throw new Error(error);
+                }else{
+                    self.riscoCurrentState = newState;
+                    typeof callback === 'function' && callback(null, self.riscoCurrentState);
+                }
             }
         } catch(err) {
             self.log.error(err);
             typeof callback === 'function' && callback(null, self.riscoCurrentState);
+        }
+    },
+
+    async GetSetArmState(self, riscoArm, cmd, state) {
+        var self = self;
+
+        const [ArmResp, RefreshInterval] = await self.RiscoSession.armDisarm(riscoArm, cmd);
+        switch (ArmResp) {
+            case 0:
+                self.log.debug('Error on armDisarm!!! Maybe a sensor is active and system cannot be armed');
+                return [null, self.riscoCurrentState];
+                break;
+            case 1:
+                if (!self.polling) {
+                    self.log.info('Partition "' + self.name + '" => Set new state: (' + state + ') -> ' + self.translateState(state));
+                }
+                self.securityService.setCharacteristic(self.Characteristic.SecuritySystemCurrentState, state);
+                return [null, state];
+                break;
+            case 2:
+                self.log.debug('The partition will be armed in ' + RefreshInterval + ' milliseconds');
+                setTimeout(self.GetSetArmState, RefreshInterval, self, false, 'Refresh', state);
+                if (!self.polling) {
+                    self.log.debug('Partition "' + self.name + '" State will be refreshed in ' + RefreshInterval + ' milliseconds');
+                }
+                return [null, self.riscoCurrentState];
+                break;
         }
     },
 
@@ -193,9 +262,13 @@ RiscoCPPartitions.prototype = {
                         return (self.riscoCurrentState ? true : false);
                     })
                     .done(async function (result) {
-                        await self.RiscoSession.getPartsStates();
+                        await self.RiscoSession.getCPStates();
                         await self.getRefreshState(callback);
-                        self.log.info('Partition "' + self.name + '" => Actual state is: (' + self.riscoCurrentState + ') -> ' + self.translateState(self.riscoCurrentState));
+                        if (self.TypeOfAcc == 'group'){
+                            self.log.info('Partition "' + self.name + '" => Actual state is: (' + self.riscoCurrentState + ') -> ' + self.translateState(self.riscoCurrentState));
+                        } else {
+                            self.log.info('Group "' + self.name + '" => Actual state is: (' + self.riscoCurrentState + ') -> ' + self.translateState(self.riscoCurrentState));
+                        }
                         self.securityService.setCharacteristic(self.Characteristic.SecuritySystemCurrentState, self.riscoCurrentState);
                         return
                     });
@@ -222,7 +295,7 @@ RiscoCPPartitions.prototype = {
         var self = this;
         try{
             var self = this;
-            const PartStatesRegistry = {
+            const PGsStatesRegistry = {
                 armed: 1,
                 partial: 2,
                 disarmed: 3,
@@ -230,14 +303,26 @@ RiscoCPPartitions.prototype = {
             };
 
             var Datas = [];
-            for (var Parts in self.RiscoSession.DiscoveredAccessories.partitions) {
-                if (Parts != 'type'){
-                    Datas.push(self.RiscoSession.DiscoveredAccessories.partitions[Parts]);
+            var ItemStates;
+            if (self.TypeOfAcc == 'group'){
+                for (var Group in self.RiscoSession.DiscoveredAccessories.Groups) {
+                    if (Group != 'type'){
+                        Datas.push(self.RiscoSession.DiscoveredAccessories.Groups[Group]);
+                    }
                 }
+                ItemStates = Datas.filter(groups => groups.id == (self.RiscoPartId | ''));
+            } else {
+                for (var Parts in self.RiscoSession.DiscoveredAccessories.partitions) {
+                    if (Parts != 'type'){
+                        Datas.push(self.RiscoSession.DiscoveredAccessories.partitions[Parts]);
+                    }
+                }
+                ItemStates = Datas.filter(parts => parts.id == (self.RiscoPartId | ''));
             }
-            const PartStates = Datas.filter(parts => parts.id == (self.RiscoPartId | ''));
-            if (PartStates.length != 0) {
-                self.riscoCurrentState = PartStatesRegistry[PartStates[0].actualState];
+
+
+            if (ItemStates.length != 0) {
+                self.riscoCurrentState = PGsStatesRegistry[ItemStates[0].actualState];
                 callback(null, self.riscoCurrentState);
                 return
             } else {
