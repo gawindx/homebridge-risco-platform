@@ -26,6 +26,8 @@ function RiscoPanelSession(aConfig, aLog) {
     this.pollInterval = aConfig['pollInterval'] || 30000;
     this.Partition = aConfig['Partition'];
     this.Groups = aConfig['Groups'];
+    this.Outputs = aConfig['Outputs'];
+    this.Detectors = aConfig['Detectors'];
     this.log = aLog;
     this.req_counter = 0;
     this.riscoCookies;
@@ -305,7 +307,7 @@ RiscoPanelSession.prototype = {
                         self.log.debug(response);
                         throw new Error('KeepAlive Bad HTTP Response : ' + response.status);
                     }
-                    if (response.data.overview !== null){
+                    if ((response.data.overview !== null) || (response.data.detectors !== null)){
                         self.log.debug('Status change since the last scan. Manual update of the values.');
                         return response.data;
                     } else {
@@ -360,7 +362,7 @@ RiscoPanelSession.prototype = {
             if (response.status == 200) {
 
                 const body = response.data;
-                self.log.debug(body);
+                //self.log.debug(body);
 
                 var Parts_Datas = {};
 
@@ -571,7 +573,7 @@ RiscoPanelSession.prototype = {
                         var Output_Data = {
                             Id: Output_list[list].match(/id=".*?(\d*)"/s)[1],
                             name: Output_list[list].match(/<.*[\d|e]">(.*)<\/[s|l]/)[1],
-                            Command: Output_Cmd,
+                            Required: null,
                             Type: (function() {
                                     if (Output_Cmd.match(/(\d)\)$/) == null) {
                                         return 'pulse';
@@ -579,20 +581,40 @@ RiscoPanelSession.prototype = {
                                         return 'switch';
                                     }
                                 })(),
-                            Value: (function(){ 
+                            State: (function(){ 
                                     if (Output_Cmd.match(/(\d)\)$/) == null) {
-                                        return 0;
+                                        return false;
                                     } else {
-                                        return Math.abs(parseInt(Output_Cmd.match(/(\d)\)$/)[1]) - 1);
+                                       return  ((Math.abs(parseInt(Output_Cmd.match(/(\d)\)$/)[1]) - 1)) ? true : false);
                                     }
                                 })()
                         };
-
+                        self.log.debug('Discovering Outputs : ' + Output_Data.name + ' with Id : ' + Output_Data.Id);
+                        if (self.Outputs == 'all') {
+                            self.log.debug('All Outputs Required');
+                            Output_Data.Required = true;
+                        } else if (self.Outputs != (self.Outputs.split(',')) || ( parseInt(self.Outputs) != NaN )){
+                            self.log.debug('Not All Outputs Required');
+                            //Automatically convert string value to integer
+                            const Required_Outputs = self.Outputs.split(',').map(function(item) {
+                                return parseInt(item, 10);
+                            });
+                            if (Required_Outputs.includes(Output_Data.Id) !== false){
+                                self.log.debug('Outputs "' + Output_Data.name + '" Required');
+                                Output_Data.Required = true;
+                            } else {
+                                self.log.debug('Outputs "' + Output_Data.name + '" Not Required');
+                                Output_Data.Required = false;
+                            }
+                        } else {
+                            self.log.debug('No Outputs Required');
+                            Output_Data.Required = false;
+                        }
                         self.log.debug('name : ' + Output_Data.name);
                         self.log.debug('Id : ' + Output_Data.Id);
                         self.log.debug('Command : ' + Output_Data.Command);
                         self.log.debug('Type : ' + Output_Data.Type);
-                        self.log.debug('Value  : ' + Output_Data.Value);
+                        self.log.debug('State  : ' + Output_Data.State);
                         Outputs_Datas[Output_Data.Id] = Output_Data;
                     }
                     self.log.debug(JSON.stringify(Outputs_Datas));
@@ -638,18 +660,61 @@ RiscoPanelSession.prototype = {
                         for (var Detector in response.data.detectors.parts[Parts].detectors){
                             self.log.debug(JSON.stringify(response.data.detectors.parts[Parts].detectors[Detector]));
                             var Detector_Data = {
-                                id: response.data.detectors.parts[Parts].detectors[Detector].id,
-                                bypassed: response.data.detectors.parts[Parts].detectors[Detector].bypassed,
-                                type: response.data.detectors.parts[Parts].detectors[Detector].data_icon,
+                                Id: response.data.detectors.parts[Parts].detectors[Detector].id,
+                                StatusActive: (function() {
+                                            if (response.data.detectors.parts[Parts].detectors[Detector].bypassed === false){
+                                                return true;
+                                            } else {
+                                                return false;
+                                            }
+                                })(),
+                                //type: response.data.detectors.parts[Parts].detectors[Detector].data_icon,
                                 Partition: Parts,
+                                Required: null,
                                 name: (function() {
                                             var tmp_name = response.data.detectors.parts[Parts].detectors[Detector].name;
                                             return tmp_name.replace(/&#(\d+);/g, function(match, dec) {
                                                 return String.fromCharCode(dec);
                                             });
+                                })(),
+                                State: (function() {
+                                            //'detector' for inactive
+                                            //'detector2' for active
+                                            //'detector5' for bypassed
+                                            //'detector??' for tampered
+                                            if (response.data.detectors.parts[Parts].detectors[Detector].data_icon == 'detector'){
+                                                return false;
+                                            } else {
+                                                if (response.data.detectors.parts[Parts].detectors[Detector].data_icon == 'detector5'){
+                                                    return false;
+                                                } else {
+                                                    return true;
+                                                }
+                                            }
                                 })()
                             };
-                            Detectors_Datas[Detector_Data.id] = Detector_Data;
+                            self.log.debug('Detector ' + Detector_Data.name + ' icon ' + response.data.detectors.parts[Parts].detectors[Detector].data_icon);
+                            if (self.Detectors == 'all') {
+                                self.log.debug('All Detectors Required');
+                                Detector_Data.Required = true;
+                            } else if (self.Detectors != (self.Detectors.split(',')) || ( parseInt(self.Detectors) != NaN )){
+                                self.log.debug('Not All Detectors Required');
+                                //Automatically convert string value to integer
+                                const Required_Detectors = self.Detectors.split(',').map(function(item) {
+                                    return parseInt(item, 10);
+                                });
+                                if (Required_Detectors.includes(Detector_Data.Id) !== false){
+                                    self.log.debug('Detectors "' + Detector_Data.name + '" Required');
+                                    Detector_Data.Required = true;
+                                } else {
+                                    self.log.debug('Detectors "' + Detector_Data.name + '" Not Required');
+                                    Detector_Data.Required = false;
+                                }
+                            } else {
+                                self.log.debug('No Detectors Required');
+                                Detector_Data.Required = false;
+                            }
+                            Detectors_Datas[Detector_Data.Id] = Detector_Data;
                         }
                     }
                     return Detectors_Datas;
@@ -712,6 +777,45 @@ RiscoPanelSession.prototype = {
             self.log.error(err);
         }
     },
+/*
+    async getOverview() {
+        var self = this;
+        try {
+            await self.KeepAlive();
+
+            var response;
+            const post_data = {};
+            response = await axios({
+                url: 'https://www.riscocloud.com/ELAS/WebUI/Overview/Get',
+                method: 'POST',
+                headers: {
+                    Referer: 'https://www.riscocloud.com/ELAS/WebUI/MainPage/MainPage',
+                    Origin: 'https://www.riscocloud.com',
+                    Cookie: self.riscoCookies
+                },
+                data: {},
+
+                validateStatus(status) {
+                    return status >= 200 && status < 400;
+                },
+                maxRedirects: 0,                        
+            });
+
+            if (response.status == 200) {
+                const body = response.data;
+                for (var PartId in body.detectors.parts) {
+                    const Id = body.detectors.parts[PartId].id
+                    self.DiscoveredAccessories.partitions[Id].previousState = self.DiscoveredAccessories.partitions[Id].actualState;
+                    self.DiscoveredAccessories.partitions[Id].actualState = (body.detectors.parts[PartId].armIcon).match(/ico-(.*)\.png/)[1];
+                }
+            } else {
+                throw new Error('Cannot Retrieve Partitions States');
+            }
+        } catch (err) {
+            self.log.error('Error on Get Partitions States : ' + err);
+        }
+    },
+*/
 
     async getPartsStates(body) {
         var self = this;
@@ -790,6 +894,55 @@ RiscoPanelSession.prototype = {
         }
     },
 
+    async getOutputsStates(body) {
+        var self = this;
+        self.log.debug('Entering getOutputsStates function');
+        try {
+            for (var OutputId in body.haSwitch) {
+                    const Id = body.haSwitch[OutputId].ID;
+                    self.DiscoveredAccessories.Outputs[Id].State = body.haSwitch[OutputId].State;
+                    self.log.debug('Output Id: ' + Id + ' Label: ' + self.DiscoveredAccessories.Outputs[Id].name)
+            }
+            self.log.debug('Leaving getOutputsStates function');
+            return Promise.resolve();
+        } catch (err) {
+            self.log.error('Error on getOutputsStates : ' + err);
+            return Promise.reject();
+        }
+    },
+
+    async getDetectorsStates(body) {
+        var self = this;
+        self.log.debug('Entering getDetectorsStates function');
+        try {
+            for (var Parts in body.detectors.parts) {
+                for (var DetectorId in body.detectors.parts[Parts].detectors) {
+                    const Id = body.detectors.parts[Parts].detectors[DetectorId].id;
+                    self.DiscoveredAccessories.Detectors[Id].StatusActive = (function() {
+                        if (body.detectors.parts[Parts].detectors[DetectorId].bypassed === false){
+                            return true;
+                        } else {
+                            return false;
+                        }
+                    })();
+                    self.DiscoveredAccessories.Detectors[Id].State = (function() {
+                        if (body.detectors.parts[Parts].detectors[DetectorId].data_icon == 'detector2'){
+                            return true;
+                        } else {
+                            return false;
+                        }
+                    })();
+                    self.log.debug('Detector Id: ' + Id + ' Label: ' + self.DiscoveredAccessories.Detectors[Id].name)
+                }
+            }
+            self.log.debug('Leaving getDetectorsStates function');
+            return Promise.resolve();
+        } catch (err) {
+            self.log.error('Error on getDetectorsStates : ' + err);
+            return Promise.reject();
+        }
+    },
+
     async getCPStates() {
         var self = this;
         self.log.debug('Entering getCPStates function');
@@ -818,7 +971,7 @@ RiscoPanelSession.prototype = {
                     if (response.status == 200) {
                         body = response.data;
                     } else {
-                        throw new Error('Cannot Retrieve Partitions States');
+                        throw new Error('Cannot Retrieve Panel States');
                     }
                 } else {
                     self.log.debug('KeepAlive report a change. Using its result for status update.');
@@ -844,6 +997,17 @@ RiscoPanelSession.prototype = {
             if (((this.Groups || 'none') != 'none') && (body.allGrpState != null)){
                 await self.getGroupsStates(body);
             }
+            if (((this.Outputs || 'none') != 'none') && (body.haSwitch != null)){
+                await self.getOutputsStates(body);
+            }
+            self.log.debug(JSON.stringify(body));
+            if (((this.Detectors || 'none') != 'none') && (body.detectors != null)){
+                await self.getDetectorsStates(body);
+            }
+            /*
+            if ((this.config['Cameras'] || 'none') != 'none') {
+                await self.getPartsStates();
+            }*/
             return Promise.resolve(true);
         } catch (err) {
             return Promise.reject(err);
@@ -911,6 +1075,96 @@ RiscoPanelSession.prototype = {
         }catch(err){
             self.log('Error on armDisarm function: ' + err);
             return [0, NaN];
+        }
+    },
+
+    async HACommand(type, devId) {
+        var self = this;
+        self.log.debug('Entering HACommand function');
+        try {
+            await self.KeepAlive();
+
+            var targetType = type;
+            var targetdevId;
+
+            const response = await axios({
+                url: 'https://www.riscocloud.com/ELAS/WebUI/Automation/HACommand',
+                method: 'POST',
+                headers: {
+                    Referer: 'https://www.riscocloud.com/ELAS/WebUI/MainPage/MainPage',
+                    Origin: 'https://www.riscocloud.com',
+                    Cookie: self.riscoCookies,
+                    'Content-type': 'application/x-www-form-urlencoded'
+                },
+                data: 'type=' + targetType + '&devId=' + devId,
+
+                validateStatus(status) {
+                    return status >= 200 && status < 400;
+                },
+                maxRedirects: 0,                        
+            });
+
+            if (response.status == 200){
+                //response for pulse switch ok : {error: 0, haSwitch: [], devId: 2}
+                if (response.data.error != 0){
+                    self.log.debug('HACommand Not Ok. Using this result for status update');
+                    self.log.debug('errType: ' + JSON.stringify(response.data));
+                    self.UpdateCPStates(response.data);
+                    return false;
+                } else {
+                    self.log.debug('HACommand Ok. Using this result for status update');
+                    self.UpdateCPStates(response.data);
+                    return true;
+                }
+            } else {
+                throw new Error('Bad HTTP Response: ' + response.status);
+            }
+        }catch(err){
+            self.log('Error on HACommand function: ' + err);
+            return false;
+        }
+    },
+
+    async SetBypass(state, devId) {
+        var self = this;
+        self.log.debug('Entering SetBypass function');
+        try {
+            await self.KeepAlive();
+
+            const response = await axios({
+                url: 'https://www.riscocloud.com/ELAS/WebUI/Detectors/SetBypass',
+                method: 'POST',
+                headers: {
+                    Referer: 'https://www.riscocloud.com/ELAS/WebUI/MainPage/MainPage',
+                    Origin: 'https://www.riscocloud.com',
+                    Cookie: self.riscoCookies,
+                    'Content-type': 'application/x-www-form-urlencoded'
+                },
+                data: 'id=' + devId + '&bypass=' + state,
+
+                validateStatus(status) {
+                    return status >= 200 && status < 400;
+                },
+                maxRedirects: 0,                        
+            });
+
+            if (response.status == 200){
+                if (response.data.error != 0){
+                    self.log.debug('SetBypass Not Ok. Using this result for status update');
+                    self.log.debug('errType: ' + JSON.stringify(response.data));
+                    self.UpdateCPStates(response.data);
+                    return false;
+                } else {
+                    self.log.debug('SetBypass Ok. Using this result for status update');
+                    self.UpdateCPStates(response.data);
+                    return true;
+                }
+            } else {
+                throw new Error('Bad HTTP Response: ' + response.status);
+            }
+        }catch(err){
+            self.log('Error on SetBypass function: ' + err);
+            return false;
         }
     }
 }

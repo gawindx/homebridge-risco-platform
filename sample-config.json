@@ -11,6 +11,8 @@
             "riscoPIN": "",
             "Partition": "none|all|system|0,1,..",
             "Groups": "all|none|0,1,2,....",
+            "Outputs": "all|none|0,1,2,....",
+            "Detectors": "all|none|0,1,2,....",
         }
     ]
 }

@@ -1,15 +1,14 @@
 'use strict';
 var pjson = require('./package.json');
+var Manufacturer = "Gawindx";
 var waitUntil = require('wait-until');
 var pollingtoevent = require('polling-to-event');
 
 module.exports = {
     RiscoCPPartitions: RiscoCPPartitions,
-    RiscoCPGroups: RiscoCPGroups
-}
-
-function RiscoCPGroups(log, accConfig, homebridge) {
-    return new RiscoCPPartitions(log, accConfig, homebridge, 'group');
+    RiscoCPGroups: RiscoCPGroups,
+    RiscoCPOutputs: RiscoCPOutputs,
+    RiscoCPDetectors: RiscoCPDetectors
 }
 
 function RiscoCPPartitions(log, accConfig, homebridge, TypeOfAcc ='partition') {
@@ -24,7 +23,13 @@ function RiscoCPPartitions(log, accConfig, homebridge, TypeOfAcc ='partition') {
         } else {
             return accConfig.config.id;
         }
-        })();
+    })();
+    if (this.TypeOfAcc == 'partition') {
+        this.longName = 'part_' + this.RiscoPartId + '_' + (this.name.toLowerCase()).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ /g, '_');
+    } else {
+        this.longName = 'group_' + this.RiscoPartId + '_' + (this.name.toLowerCase()).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ /g, '_');
+    }
+    this.uuid_base = homebridge.hap.uuid.generate(this.longName);
     this.polling = accConfig.polling || false;
     this.pollInterval = accConfig.pollInterval || 30000;
     this.services = [];
@@ -33,7 +38,7 @@ function RiscoCPPartitions(log, accConfig, homebridge, TypeOfAcc ='partition') {
     
     this.infoService = new this.Service.AccessoryInformation();
     this.infoService
-        .setCharacteristic(this.Characteristic.Manufacturer, "Daniel S")
+        .setCharacteristic(this.Characteristic.Manufacturer, Manufacturer)
         .setCharacteristic(this.Characteristic.Model, this.name)
         .setCharacteristic(this.Characteristic.SerialNumber, pjson.version);
 
@@ -51,8 +56,7 @@ function RiscoCPPartitions(log, accConfig, homebridge, TypeOfAcc ='partition') {
         .on('set', this.setTargetState.bind(this));
 
     this.services.push(this.securityService);
-
-    this.long_event_name = 'long_' + (this.name.toLowerCase()).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ /g, '_');
+    this.long_event_name = 'long_'+ this.longName;
     // Default Value
     this.riscoCurrentState;// = 3; // Do not set default. Looks like plugin get restarted after some time. Generates false alarms.
 
@@ -87,6 +91,156 @@ function RiscoCPPartitions(log, accConfig, homebridge, TypeOfAcc ='partition') {
         });
     }
 
+}
+
+function RiscoCPGroups(log, accConfig, homebridge) {
+    return new RiscoCPPartitions(log, accConfig, homebridge, 'group');
+}
+
+function RiscoCPOutputs(log, accConfig, homebridge) {
+
+    this.log = log;
+    this.name = accConfig.config.name;
+    this.RiscoSession = accConfig.RiscoSession;
+    this.RiscoOutputId = (function(){
+            return accConfig.config.Id;
+        })();
+    this.longName = 'out_' + this.RiscoOutputId + '_' + (this.name.toLowerCase()).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ /g, '_');
+    this.uuid_base = homebridge.hap.uuid.generate(this.longName);
+    this.TypePulse = (function(){
+            if (accConfig.config.Type == 'pulse') {
+                return true;
+            } else {
+                return false;
+            }
+        })();
+    this.polling = accConfig.polling || false;
+    this.pollInterval = accConfig.pollInterval || 30000;
+    this.services = [];
+    this.Service = homebridge.hap.Service;
+    this.Characteristic = homebridge.hap.Characteristic;
+    
+    this.infoService = new this.Service.AccessoryInformation();
+    this.infoService
+        .setCharacteristic(this.Characteristic.Manufacturer, Manufacturer)
+        .setCharacteristic(this.Characteristic.Model, this.name)
+        .setCharacteristic(this.Characteristic.SerialNumber, pjson.version);
+
+    this.services.push(this.infoService);
+    
+    this.outputService = new this.Service.Switch(this.name);
+
+    this.outputService
+        .getCharacteristic(this.Characteristic.On)
+        .on('get', this.getCurrentState.bind(this))
+        .on('set', this.setTargetState.bind(this));
+
+    this.services.push(this.outputService);
+
+    // Default Value
+    this.log.debug('Output "' + this.name + ' default State: ' + accConfig.config.State);
+    this.RiscoOutputState = accConfig.config.State;
+    this.IsPulsed = false;
+    this.long_event_name = 'long_Out_' + this.longName;
+    
+    if (this.TypePulse !== true) {
+        var self = this;
+        // set up polling if requested
+        if (self.polling) {
+            var emitter = new pollingtoevent(function (done) {
+                self.getRefreshState(function (err, result) {
+                    done(err, result);
+                });
+            }, {
+                longpollEventName: self.long_event_name,
+                longpolling: true,
+                interval: 1000
+            });
+
+            emitter.on(self.long_event_name, function (state) {
+                self.log.info('Output "' + self.name + '" => New state detected: (' + state + '). Notify!');
+                self.RiscoOutputState = state;
+                self.outputService.setCharacteristic(self.Characteristic.On, self.RiscoOutputState);
+            });
+
+            emitter.on("err", function (err) {
+                self.log.error("Polling failed, error was %s", err);
+            });
+        }        
+    }
+
+}
+
+function RiscoCPDetectors(log, accConfig, homebridge) {
+
+    this.log = log;
+    this.name = accConfig.config.name;
+    this.RiscoSession = accConfig.RiscoSession;
+    this.RiscoDetectorId = (function(){
+            return accConfig.config.Id;
+        })();
+    this.longName = 'det_' + this.RiscoDetectorId + '_' + (this.name.toLowerCase()).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ /g, '_');
+    this.uuid_base = homebridge.hap.uuid.generate(this.longName);
+    this.polling = accConfig.polling || false;
+    this.pollInterval = accConfig.pollInterval || 30000;
+    this.services = [];
+    this.Service = homebridge.hap.Service;
+    this.Characteristic = homebridge.hap.Characteristic;
+
+    this.infoService = new this.Service.AccessoryInformation();
+    this.infoService
+        .setCharacteristic(this.Characteristic.Manufacturer, Manufacturer)
+        .setCharacteristic(this.Characteristic.Model, this.name)
+        .setCharacteristic(this.Characteristic.SerialNumber, pjson.version);
+
+    this.services.push(this.infoService);
+    
+    this.detectorService = new this.Service.MotionSensor(this.name);
+    this.detectorService
+        .getCharacteristic(this.Characteristic.MotionDetected)
+        .on('get', this.getCurrentState.bind(this));
+
+    this.detectorService
+        .getCharacteristic(this.Characteristic.StatusActive)
+        .on('set', this.setCurrentState.bind(this));
+
+    this.services.push(this.detectorService);
+
+    this.DetectorReady = false;
+
+    // Default Value
+    this.log.debug('Detector "' + this.name + ' default State: ' + accConfig.config.State);
+    this.RiscoDetectorState = accConfig.config.State;
+    this.RiscoDetectorBypassState = accConfig.config.StatusActive;
+    this.long_event_name = 'long_Det_' + this.longName;
+    
+    var self = this;
+    // set up polling if requested
+    if (self.polling) {
+        var emitter = new pollingtoevent(function (done) {
+            self.getRefreshState(function (err, result) {
+                done(err, result);
+            });
+        }, {
+            longpollEventName: self.long_event_name,
+            longpolling: true,
+            interval: 1000
+        });
+
+        emitter.on(self.long_event_name, function (state) {
+
+            self.log.info('Detector "' + self.name + '" => New state detected: (' + state[0] + '). Notify!');
+            self.RiscoDetectorState = state[0];
+            self.detectorService.setCharacteristic(self.Characteristic.MotionDetected, self.RiscoDetectorState);
+            self.log.info('Detector "' + self.name + '" => New Active state detected: (' + state[1] + '). Notify!');
+            self.RiscoDetectorActiveState = state[1];
+            self.detectorService.setCharacteristic(self.Characteristic.StatusActive, self.RiscoDetectorActiveState);
+        });
+
+        emitter.on("err", function (err) {
+            self.log.error("Polling failed, error was %s", err);
+        });
+    }        
 }
 
 RiscoCPPartitions.prototype = {
@@ -195,7 +349,6 @@ RiscoCPPartitions.prototype = {
                         cmd = (self.RiscoPartId | '') + cmd_separator + self.RiscoSession.DiscoveredAccessories.partitions[PartId].disarmCommand;
                         break;
                 };
-                
                 const [error, newState] = await self.GetSetArmState(self, riscoArm, cmd, state);
                 if (error !== null) {
                     throw new Error(error);
@@ -294,14 +447,12 @@ RiscoCPPartitions.prototype = {
     async getRefreshState(callback) {
         var self = this;
         try{
-            var self = this;
             const PGsStatesRegistry = {
                 armed: 1,
                 partial: 2,
                 disarmed: 3,
                 ongoing: 4
             };
-
             var Datas = [];
             var ItemStates;
             if (self.TypeOfAcc == 'group'){
@@ -319,7 +470,6 @@ RiscoCPPartitions.prototype = {
                 }
                 ItemStates = Datas.filter(parts => parts.id == (self.RiscoPartId | ''));
             }
-
 
             if (ItemStates.length != 0) {
                 self.riscoCurrentState = PGsStatesRegistry[ItemStates[0].actualState];
@@ -344,3 +494,239 @@ RiscoCPPartitions.prototype = {
         return this.services;
     }
 };
+
+RiscoCPOutputs.prototype = {
+    async getRefreshState(callback) {
+        var self = this;
+        try{
+            var Datas = [];
+            var ItemStates;
+            for (var Output in self.RiscoSession.DiscoveredAccessories.Outputs) {
+                Datas.push(self.RiscoSession.DiscoveredAccessories.Outputs[Output]);
+            }
+            ItemStates = Datas.filter(outputs => outputs.Id == (self.RiscoOutputId | ''));
+
+            if (ItemStates.length != 0) {
+                self.RiscoOutputState = (function(){ 
+                                    if (ItemStates[0].State == 0) {
+                                        return false;
+                                    } else {
+                                       return  true;
+                                    }
+                                })();
+                callback(null, self.RiscoOutputState);
+                return
+            } else {
+                throw new Error('Error on Output RefreshState!!!');
+            }
+        } catch(err){
+            self.log.error(err);
+            callback(null, self.RiscoOutputState);
+            return
+        }
+    },
+
+    async getCurrentState(callback) {
+        var self = this;
+        try{
+            if (self.polling){
+                self.log.debug('Output is '+ self.RiscoOutputState);
+                if (self.TypePulse === false) {
+                    callback(null, self.RiscoOutputState);
+                } else {
+                    callback(null, false);
+                }
+            } else {
+                if (self.TypePulse === false) {
+                    self.log.info('Output "' + self.name + '" =>Getting current state - delayed...');
+                    waitUntil()
+                        .interval(500)
+                        .times(15)
+                        .condition(function () {
+                            return (self.RiscoOutputState ? true : false);
+                        })
+                        .done(async function (result) {
+                            await self.RiscoSession.getCPStates();
+                            await self.getRefreshState(callback);
+                            self.log.debug('Output "' + self.name + '" => Actual state is: (' + self.RiscoOutputState + ')');
+                            self.outputService.setCharacteristic(self.Characteristic.On, self.RiscoOutputState);
+                            return
+                        });
+                } else {
+                    callback(null, false);
+                }
+            }
+        } catch (err) {
+            self.log.error(err);
+            self.outputService.setCharacteristic(self.Characteristic.On, self.RiscoOutputState);
+            callback(null, self.RiscoOutputState);
+            return
+        }
+    },
+
+    async setTargetState(state, callback) {
+        var self = this;
+        self.log.debug('Set Output to: ' +  state);
+        self.RiscoOutputState = state;
+        var HACResp;
+        //convert state to 1/0
+
+        if (self.IsPulsed){
+            HACResp = true;
+        } else {
+            if (self.TypePulse) {
+                HACResp = await self.RiscoSession.HACommand('1', self.RiscoOutputId);
+            } else {
+                var newstate;
+                if (state) {
+                    newstate = 1;
+                } else {
+                    newstate = 0;
+                }
+                HACResp = await self.RiscoSession.HACommand(newstate, self.RiscoOutputId);            
+            }
+        }
+        if (HACResp){
+            if (!self.polling){
+                self.log.info('Output "' + self.name + '" => Set new state: (' + state + ')');
+            }
+            if (self.TypePulse === false) {
+                self.log.debug('Not a pulse switch, update it')
+                self.RiscoOutputState = state;
+                typeof callback === 'function' && callback(null, self.RiscoOutputState);
+            } else {
+                if (self.IsPulsed) {
+                    self.log.debug('Pulse switch is already pulsed');
+                    self.IsPulsed = false;
+                    typeof callback === 'function' && callback(null, self.RiscoOutputState);
+                } else {
+                    self.log.debug('Pulse switch is not already pulsed');
+                    self.IsPulsed = true;
+                    setTimeout(self.ResetPulseSwitchState, 500, self);
+                    self.RiscoOutputState = false;
+                    typeof callback === 'function' && callback(null, self.RiscoOutputState);
+                }
+            }
+            
+        } else {
+            self.log.error('Error on HACommand!!!');
+            typeof callback === 'function' && callback(null, self.RiscoOutputState);
+        }
+    },
+
+    async ResetPulseSwitchState(self) {
+        var self = self;
+        self.log.debug('Reset Pulse Switch State to ' + self.RiscoOutputState);
+        self.outputService.setCharacteristic(self.Characteristic.On, self.RiscoOutputState);
+    },
+
+    identify: function (callback) {
+        self.log.info('Identify requested!');
+        callback(); // success
+    },
+
+    getServices: function () {
+        return this.services;
+    }
+};
+
+RiscoCPDetectors.prototype = {
+    async getRefreshState(callback) {
+        var self = this;
+        try{
+            var Datas = [];
+            var ItemStates;
+            for (var Detector in self.RiscoSession.DiscoveredAccessories.Detectors) {
+                Datas.push(self.RiscoSession.DiscoveredAccessories.Detectors[Detector]);
+            }
+            ItemStates = Datas.filter(detectors => detectors.Id == (self.RiscoDetectorId | ''));
+
+            if (ItemStates.length != 0) {
+                self.RiscoDetectorState = ItemStates[0].State;
+                self.RiscoDetectorActiveState = ItemStates[0].StatusActive;
+                self.DetectorReady = true;
+                callback(null, [self.RiscoDetectorState, self.RiscoDetectorActiveState]);
+                return
+            } else {
+                throw new Error('Error on Detector RefreshState!!!');
+            }
+        } catch(err){
+            self.log.error(err);
+            callback(null, [self.RiscoDetectorState, self.RiscoDetectorActiveState]);
+            self.DetectorReady = true;
+            return
+        }
+    },
+
+    async getCurrentState(callback) {
+        var self = this;
+        try{
+            if (self.polling){
+                self.log.debug('Detector "' + self.name + '"" MotionDetected: '+ self.RiscoDetectorState);
+                self.log.debug('Detector "' + self.name + '"" is Active:'+ self.RiscoDetectorActiveState);
+                callback(null, [self.RiscoDetectorState, self.RiscoDetectorActiveState]);
+            } else {
+                self.log.info('Detector "' + self.name + '" =>Getting current state - delayed...');
+                waitUntil()
+                    .interval(500)
+                    .times(15)
+                    .condition(function () {
+                        return ( (self.RiscoDetectorState ? true : false) || (self.RiscoDetectorActiveState ? true : false));
+                    })
+                    .done(async function (result) {
+                        await self.RiscoSession.getCPStates();
+                        await self.getRefreshState(callback);
+                        self.log.debug('Detector "' + self.name + '" => Actual Motion state is: (' + self.RiscoDetectorState + ')');
+                        self.log.debug('Detector "' + self.name + '" => Actual Active state is: (' + self.RiscoDetectorActiveState + ')');
+                        self.DetectorReady = true;
+                        self.detectorService.setCharacteristic(self.Characteristic.MotionDetected, self.RiscoDetectorState);
+                        self.detectorService.setCharacteristic(self.Characteristic.StatusActive, self.RiscoDetectorActiveState);
+                        return
+                    });
+            }
+        } catch (err) {
+            self.log.error(err);
+            self.detectorService.setCharacteristic(self.Characteristic.MotionDetected, self.RiscoDetectorState);
+            self.detectorService.setCharacteristic(self.Characteristic.StatusActive, self.RiscoDetectorActiveState);
+            callback(null, [self.RiscoDetectorState, self.RiscoDetectorActiveState]);
+            return
+        }
+    },
+
+    async setCurrentState(state, callback) {
+        var self = this;
+        if (self.DetectorReady){
+            state = (state) ? false : true;
+            self.log.debug('Set Active Detector "' +self.name +'" to: ' +  state);
+            var SBpResp;
+            self.log.info(self.name + ' Actual State: ' + self.RiscoDetectorActiveState);
+            self.log.info(self.name + ' New State: ' + state);
+            if (self.RiscoDetectorActiveState != state) {
+                SBpResp = true;
+                self.log.info(self.name + ' Identical State');
+            } else {
+                SBpResp = await self.RiscoSession.SetBypass(((state) ? 1 : 0 ), self.RiscoDetectorId);
+                self.log.info(self.name + ' Different State');
+            }
+            if (SBpResp){
+                if (!self.polling){
+                    self.log.info('Detector "' + self.name + '" => Set new Bypass state: (' + state + ')');
+                }
+                typeof callback === 'function' && callback(null, [self.RiscoDetectorState, self.RiscoDetectorActiveState]);
+            } else {
+                self.log.error('Error on SetBypass!!!');
+                typeof callback === 'function' && callback(null, [self.RiscoDetectorState, self.RiscoDetectorActiveState]);
+            }
+        }
+    },
+
+    identify: function (callback) {
+        self.log.info('Identify requested!');
+        callback(); // success
+    },
+
+    getServices: function () {
+        return this.services;
+    }
+};
+
