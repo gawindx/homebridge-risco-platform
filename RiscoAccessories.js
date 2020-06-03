@@ -68,6 +68,7 @@ function RiscoCPPartitions(log, accConfig, homebridge, TypeOfAcc ='partition') {
         // 1 -  Characteristic.SecuritySystemTargetState.AWAY_ARM: => Full Armed Mode
         // 2 -  Characteristic.SecuritySystemTargetState.NIGHT_ARM: => Partial Mode
         // 3 -  Characteristic.SecuritySystemTargetState.DISARM: => Really ?? Disarmed
+        // 4 -  Characteristic.SecuritySystemTargetState.ALARM: => Alarm
         var emitter = new pollingtoevent(function (done) {
             self.getRefreshState(function (err, result) {
                 done(err, result);
@@ -266,7 +267,7 @@ RiscoCPPartitions.prototype = {
                 translatedSate = "ALARM"
                 break;
         };
-        return translatedSate
+        return translatedSate;
     },
 
     async setTargetState(state, callback) {
@@ -451,7 +452,6 @@ RiscoCPPartitions.prototype = {
                 armed: 1,
                 partial: 2,
                 disarmed: 3,
-                ongoing: 4
             };
             var Datas = [];
             var ItemStates;
@@ -473,6 +473,9 @@ RiscoCPPartitions.prototype = {
 
             if (ItemStates.length != 0) {
                 self.riscoCurrentState = PGsStatesRegistry[ItemStates[0].actualState];
+                if (ItemStates[0].OnAlarm == true){
+                    self.riscoCurrentState = 4;
+                }
                 callback(null, self.riscoCurrentState);
                 return
             } else {
@@ -729,4 +732,3 @@ RiscoCPDetectors.prototype = {
         return this.services;
     }
 };
-
