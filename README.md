@@ -6,7 +6,7 @@ When Polling option is enabled, Alarm state is refreshed in background, that mea
 # Installation
 
 1. Install homebridge using: npm install -g homebridge
-2. Install this plugin using: npm install -g homebridge-risco-alarm
+2. Install this plugin using: npm install -g homebridge-risco-platform
 3. Update your configuration file. See sample config.json snippet below. 
 
 # Configuration
@@ -71,22 +71,6 @@ To get your riscoSiteId, login to riscocloud via ChromeBrowser (first login scre
 `<div class="site-name" id="site_12345_div">`
 
 In that case "12345" is your siteId which should be placed in new config file.
-
-
-For beta testing :
-
-Manual addition procedure axios (based on the use of the image Docker oznu / homebridge: debian) and assuming that the container is running:
-* Before proceeding with the installation of axios, it is necessary to update the files 'package.json', 'app.js', 'risco.js' and 'RiscoAccessories.js'
-* Connect to the container
-docker exec -ti container_name sh
-* go to the plugin directory
-cd /homebridge/node_modules/homebridge-risco-alarm/node_modules
-* install in the current directory
-npm i --prefix ./ axios
-
-
-
-
 
 TODO:
 * Add the ability to set the arming / partial / night / disarm commands
