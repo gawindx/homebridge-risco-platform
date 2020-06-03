@@ -1,6 +1,6 @@
 {
   "name": "homebridge-risco-platform",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "RiscoAlarm Plugin Platform for Homebridge",
   "dependencies": {
     "polling-to-event": "^2.1.0",
@@ -23,9 +23,14 @@
   "main": "app.js",
   "repository": {
     "type": "git",
-    "url": "https://github.com/gawindx/homebridge-risco-platform"
+    "url": "git+https://github.com/gawindx/homebridge-risco-platform.git"
   },
   "scripts": {
     "start": "node app"
-  }
+  },
+  "bugs": {
+    "url": "https://github.com/gawindx/homebridge-risco-platform/issues"
+  },
+  "homepage": "https://github.com/gawindx/homebridge-risco-platform#readme",
+  "author": "Gawindx"
 }
