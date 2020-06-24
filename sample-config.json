@@ -13,6 +13,10 @@
             "Groups": "all|none|0,1,2,....",
             "Outputs": "all|none|0,1,2,....",
             "Detectors": "all|none|0,1,2,....",
+            "Custom": {
+                "Door": "all|0,1,2,....",
+                "Window": "all|0,1,2,...."
+            }
         }
     ]
 }

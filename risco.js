@@ -225,7 +225,7 @@ RiscoPanelSession.prototype = {
                 throw new Error('Bad HTTP Response : ' + response.status);
             }
         } catch (err) {
-            self.log.error('UserCodeExpired error : ' + err );            
+            self.log.error('UserCodeExpired error : ' + err );
         }
     },
 
@@ -357,7 +357,7 @@ RiscoPanelSession.prototype = {
                 validateStatus(status) {
                     return status >= 200 && status < 400;
                 },
-                maxRedirects: 0,                        
+                maxRedirects: 0,
             });
 
             if (response.status == 200) {
@@ -460,7 +460,7 @@ RiscoPanelSession.prototype = {
                 validateStatus(status) {
                     return status >= 200 && status < 400;
                 },
-                maxRedirects: 0,                        
+                maxRedirects: 0,
             });
 
             if (response.status == 200){
@@ -558,7 +558,7 @@ RiscoPanelSession.prototype = {
                 validateStatus(status) {
                     return status >= 200 && status < 400;
                 },
-                maxRedirects: 0,                        
+                maxRedirects: 0,
             }); 
 
             if (response.status == 200){
@@ -651,7 +651,7 @@ RiscoPanelSession.prototype = {
                 validateStatus(status) {
                     return status >= 200 && status < 400;
                 },
-                maxRedirects: 0,                        
+                maxRedirects: 0,
             }); 
 
             if (response.status == 200){
@@ -664,6 +664,7 @@ RiscoPanelSession.prototype = {
                             self.log.debug(JSON.stringify(response.data.detectors.parts[Parts].detectors[Detector]));
                             var Detector_Data = {
                                 Id: response.data.detectors.parts[Parts].detectors[Detector].id,
+                                Type: "Detector",
                                 StatusActive: (function() {
                                             if (response.data.detectors.parts[Parts].detectors[Detector].bypassed === false){
                                                 return true;
@@ -802,7 +803,7 @@ RiscoPanelSession.prototype = {
                 validateStatus(status) {
                     return status >= 200 && status < 400;
                 },
-                maxRedirects: 0,                        
+                maxRedirects: 0,
             });
 
             if (response.status == 200) {
@@ -839,7 +840,7 @@ RiscoPanelSession.prototype = {
                         for (var LogRecord in LogRecords){
                             self.log.debug('Record Id:' + JSON.stringify(LogRecord));
                             self.log.debug('Record value:' + JSON.stringify(LogRecords[LogRecord]));
-                            if (LogRecords[LogRecord].Priority == "alarm") {
+                            if (LogRecords[LogRecord].Priority == 'alarm') {
                                 self.log.debug('Event is an Alarm');
                                 ZIdAlarm.push(LogRecords[LogRecord].ZoneId);
                             } else {
@@ -863,7 +864,7 @@ RiscoPanelSession.prototype = {
                                 self.log.debug('Detector is in partition ' + detector.Partition);
                                 PIdAlarm.push(parseInt(detector.Partition));
                                 ZIdAlarm.push(detector.Id);
-                        })());                        
+                        })());
                     }
 
                     if (ZIdAlarm.length >= 1) {
@@ -1080,7 +1081,7 @@ RiscoPanelSession.prototype = {
                         validateStatus(status) {
                             return status >= 200 && status < 400;
                         },
-                        maxRedirects: 0,                        
+                        maxRedirects: 0,
                     });
                     if (response.status == 200) {
                         body = response.data;
@@ -1174,7 +1175,7 @@ RiscoPanelSession.prototype = {
                 validateStatus(status) {
                     return status >= 200 && status < 400;
                 },
-                maxRedirects: 0,                        
+                maxRedirects: 0,
             });
 
             if (response.status == 200){
@@ -1228,7 +1229,7 @@ RiscoPanelSession.prototype = {
                 validateStatus(status) {
                     return status >= 200 && status < 400;
                 },
-                maxRedirects: 0,                        
+                maxRedirects: 0,
             });
 
             if (response.status == 200){
@@ -1272,7 +1273,7 @@ RiscoPanelSession.prototype = {
                 validateStatus(status) {
                     return status >= 200 && status < 400;
                 },
-                maxRedirects: 0,                        
+                maxRedirects: 0,
             });
 
             if (response.status == 200){

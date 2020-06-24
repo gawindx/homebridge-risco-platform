@@ -12,7 +12,7 @@ module.exports = function (homebridge) {
     Service = homebridge.hap.Service;
     Characteristic = homebridge.hap.Characteristic;
     UUIDGen = homebridge.hap.uuid;
-    homebridge.registerPlatform('homebridge-risco-alarm', 'RiscoAlarm', RiscoPanelPlatform);
+    homebridge.registerPlatform('homebridge-risco-platform', 'RiscoAlarm', RiscoPanelPlatform);
 }
 
 function RiscoPanelPlatform(log, config, api) {
@@ -57,6 +57,28 @@ RiscoPanelPlatform.prototype = {
                     this.config['Partition'] = 'system';
                     DiscoveredAccessories.partitions = await self.RiscoPanel.DiscoverParts();   
                 }
+                if ((self.config['Custom'] || 'none') != 'none') {
+                    const Custom_Types = ['Door', 'Window'];
+                    self.log.info('Apply Custom Configuration');
+                    for (var Custom_Type in Custom_Types){
+                        self.log('Modify Detectors to ' + Custom_Types[Custom_Type]);
+                        if ((self.config['Custom'][Custom_Types[Custom_Type]] || 'none') != 'none') {
+                            if (self.config['Custom'][Custom_Types[Custom_Type]] == 'all'){
+                                for (var Detector in DiscoveredAccessories.Detectors){
+                                    DiscoveredAccessories.Detectors[Detector].Type = Custom_Types[Custom_Type];
+                                }
+                            } else if (self.config['Custom'][Custom_Types[Custom_Type]] != (self.config['Custom'][Custom_Types[Custom_Type]].split(',')) || ( parseInt(self.config['Custom'][Custom_Types[Custom_Type]]) != NaN )){
+                                const Modified_Detectors = self.config['Custom'][Custom_Types[Custom_Type]].split(',').map(function(item) {
+                                    return parseInt(item, 10);
+                                });
+                                for (var Id_Detector in Modified_Detectors){
+                                    self.log.debug('Detector Name/id: ' + DiscoveredAccessories.Detectors[Modified_Detectors[Id_Detector]].name + '/' + DiscoveredAccessories.Detectors[Modified_Detectors[Id_Detector]].Id + ' Modified to ' + Custom_Types[Custom_Type]);
+                                    DiscoveredAccessories.Detectors[Modified_Detectors[Id_Detector]].Type = Custom_Types[Custom_Type];
+                                }
+                            }
+                        }
+                    }
+                }
                 self.log.debug(DiscoveredAccessories);
             } catch (err){
                 self.log.error('Error on Discovery Phase : ' + err);
@@ -69,6 +91,7 @@ RiscoPanelPlatform.prototype = {
             for (var DeviceFamily in DiscoveredAccessories){
                 switch (DeviceFamily){
                     case 'partitions':
+                        self.log.info('Add Accessory => Add Partitions');
                         if ( DiscoveredAccessories.partitions.type == 'system'){
                             self.log.info('Add Accessory => Configuration for System : ' + DiscoveredAccessories.partitions[0].name);
                             var PartConfig = {
@@ -98,6 +121,7 @@ RiscoPanelPlatform.prototype = {
                         }
                         break;
                     case 'Groups':
+                        self.log.info('Add Accessory => Add Groups');
                         for (var GroupsId in DiscoveredAccessories.Groups) {
                             if (GroupsId != 'type'){
                                 if (DiscoveredAccessories.Groups[GroupsId].Required == true ) {
@@ -115,6 +139,7 @@ RiscoPanelPlatform.prototype = {
                         }
                         break;
                     case 'Outputs':
+                        self.log.info('Add Accessory => Add Outputs');
                         for (var OutputId in DiscoveredAccessories.Outputs) {
                             if (DiscoveredAccessories.Outputs[OutputId].Required == true ) {
                                 self.log.info('Add Accessory => Configuration for Outputs Id : ' + DiscoveredAccessories.Outputs[OutputId].Id + ' and labeled "' + DiscoveredAccessories.Outputs[OutputId].name + '"');
@@ -130,6 +155,7 @@ RiscoPanelPlatform.prototype = {
                         }
                         break;
                     case 'Detectors':
+                        self.log.info('Add Accessory => Add Detectors');
                         for (var DetectorId in DiscoveredAccessories.Detectors) {
                             if (DiscoveredAccessories.Detectors[DetectorId].Required == true ) {
                                 self.log.info('Add Accessory => Configuration for Detectors Id : ' + DiscoveredAccessories.Detectors[DetectorId].Id + ' and labeled "' + DiscoveredAccessories.Detectors[DetectorId].name + '"');

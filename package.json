@@ -1,6 +1,6 @@
 {
   "name": "homebridge-risco-platform",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "RiscoAlarm Plugin Platform for Homebridge",
   "dependencies": {
     "polling-to-event": "^2.1.0",
@@ -13,6 +13,8 @@
   },
   "keywords": [
     "homebridge-plugin",
+    "homebridge-platform",
+    "platform",
     "risco",
     "alarm",
     "homekit",

@@ -167,7 +167,7 @@ function RiscoCPOutputs(log, accConfig, homebridge) {
             emitter.on("err", function (err) {
                 self.log.error("Polling failed, error was %s", err);
             });
-        }        
+        }       
     }
 
 }
@@ -177,6 +177,7 @@ function RiscoCPDetectors(log, accConfig, homebridge) {
     this.log = log;
     this.name = accConfig.config.name;
     this.RiscoSession = accConfig.RiscoSession;
+    this.Type = accConfig.config.Type;
     this.RiscoDetectorId = (function(){
             return accConfig.config.Id;
         })();
@@ -195,15 +196,60 @@ function RiscoCPDetectors(log, accConfig, homebridge) {
         .setCharacteristic(this.Characteristic.SerialNumber, pjson.version);
 
     this.services.push(this.infoService);
-    
-    this.detectorService = new this.Service.MotionSensor(this.name);
-    this.detectorService
-        .getCharacteristic(this.Characteristic.MotionDetected)
-        .on('get', this.getCurrentState.bind(this));
+    switch (this.Type){
+        case 'Detector':
+            this.detectorService = new this.Service.MotionSensor(this.name);
+            this.detectorService
+                .getCharacteristic(this.Characteristic.MotionDetected)
+                .on('get', this.getCurrentState.bind(this));
 
-    this.detectorService
-        .getCharacteristic(this.Characteristic.StatusActive)
-        .on('set', this.setCurrentState.bind(this));
+            this.detectorService
+                .getCharacteristic(this.Characteristic.StatusActive)
+                .on('set', this.setCurrentState.bind(this));
+            this.sPrefix = 'Detector';
+            this.log.debug('Create MotionDetected Detector case loop');
+            break;
+        case 'Door':
+            this.detectorService = new this.Service.Door(this.name);
+            this.detectorService
+                .getCharacteristic(this.Characteristic.CurrentDoorState)
+                .on('get', this.getCurrentState.bind(this));
+
+            /*
+            The following seems incompatible with the 'hom' Apple 'application and generates warnings from Homekit 
+            this.detectorService
+                .getCharacteristic(this.Characteristic.StatusActive)
+                .on('set', this.setCurrentState.bind(this));*/
+            this.sPrefix = 'Door Contact';
+            this.log.debug('Create Door Contact Detector case loop');
+            break;
+        case 'Window':
+            this.detectorService = new this.Service.Window(this.name);
+            this.detectorService
+                .getCharacteristic(this.Characteristic.CurrentDoorState)
+                .on('get', this.getCurrentState.bind(this));
+
+            /*
+            The following seems incompatible with the 'hom' Apple 'application and generates warnings from Homekit 
+            this.detectorService
+                .getCharacteristic(this.Characteristic.StatusActive)
+                .on('set', this.setCurrentState.bind(this));*/
+            this.sPrefix = 'Window Contact';
+            this.log.debug('Create Window Contact Detector case loop');
+            break;
+        default:
+            this.detectorService = new this.Service.MotionSensor(this.name);
+            this.detectorService
+                .getCharacteristic(this.Characteristic.MotionDetected)
+                .on('get', this.getCurrentState.bind(this));
+
+            this.detectorService
+                .getCharacteristic(this.Characteristic.StatusActive)
+                .on('set', this.setCurrentState.bind(this));
+            this.sPrefix = 'Detector';
+            this.log.debug('Create MotionDetected Detector Default loop');
+            break;
+    }
 
     this.services.push(this.detectorService);
 
@@ -230,18 +276,20 @@ function RiscoCPDetectors(log, accConfig, homebridge) {
 
         emitter.on(self.long_event_name, function (state) {
 
-            self.log.info('Detector "' + self.name + '" => New state detected: (' + state[0] + '). Notify!');
+            self.log.info(self.sPrefix +' "' + self.name + '" => New state detected: (' + state[0] + '). Notify!');
             self.RiscoDetectorState = state[0];
-            self.detectorService.setCharacteristic(self.Characteristic.MotionDetected, self.RiscoDetectorState);
-            self.log.info('Detector "' + self.name + '" => New Active state detected: (' + state[1] + '). Notify!');
+            self.detectorService.setCharacteristic(self.getCharacterisitcOfDetector(), self.RiscoDetectorState);
+            self.log.info(self.sPrefix +' "' + self.name + '" => New Active state detected (Not Bypassed=true) : (' + state[1] + '). Notify!');
             self.RiscoDetectorActiveState = state[1];
-            self.detectorService.setCharacteristic(self.Characteristic.StatusActive, self.RiscoDetectorActiveState);
+            if (self.Type == 'Detector'){
+                self.detectorService.setCharacteristic(self.Characteristic.StatusActive, self.RiscoDetectorActiveState);
+            }
         });
 
         emitter.on("err", function (err) {
             self.log.error("Polling failed, error was %s", err);
         });
-    }        
+    }       
 }
 
 RiscoCPPartitions.prototype = {
@@ -586,7 +634,7 @@ RiscoCPOutputs.prototype = {
                 } else {
                     newstate = 0;
                 }
-                HACResp = await self.RiscoSession.HACommand(newstate, self.RiscoOutputId);            
+                HACResp = await self.RiscoSession.HACommand(newstate, self.RiscoOutputId);          
             }
         }
         if (HACResp){
@@ -634,6 +682,20 @@ RiscoCPOutputs.prototype = {
 };
 
 RiscoCPDetectors.prototype = {
+    getCharacterisitcOfDetector(){
+        var self = this;
+        switch (self.Type){
+            case 'Detector':
+                return self.Characteristic.MotionDetected;
+            case 'Door':
+                return self.Characteristic.CurrentDoorState;
+            case 'Window':
+                return self.Characteristic.CurrentDoorState;
+            default:
+                return self.Characteristic.MotionDetected;
+        }
+    },
+
     async getRefreshState(callback) {
         var self = this;
         try{
@@ -651,7 +713,7 @@ RiscoCPDetectors.prototype = {
                 callback(null, [self.RiscoDetectorState, self.RiscoDetectorActiveState]);
                 return
             } else {
-                throw new Error('Error on Detector RefreshState!!!');
+                throw new Error('Error on ' + self.sPrefix +' RefreshState!!!');
             }
         } catch(err){
             self.log.error(err);
@@ -665,11 +727,11 @@ RiscoCPDetectors.prototype = {
         var self = this;
         try{
             if (self.polling){
-                self.log.debug('Detector "' + self.name + '"" MotionDetected: '+ self.RiscoDetectorState);
-                self.log.debug('Detector "' + self.name + '"" is Active:'+ self.RiscoDetectorActiveState);
+                self.log.debug(self.sPrefix +' "' + self.name + '"" MotionDetected: '+ self.RiscoDetectorState);
+                self.log.debug(self.sPrefix +' "' + self.name + '"" is Active:'+ self.RiscoDetectorActiveState);
                 callback(null, [self.RiscoDetectorState, self.RiscoDetectorActiveState]);
             } else {
-                self.log.info('Detector "' + self.name + '" =>Getting current state - delayed...');
+                self.log.info(self.sPrefix +' "' + self.name + '" =>Getting current state - delayed...');
                 waitUntil()
                     .interval(500)
                     .times(15)
@@ -679,18 +741,22 @@ RiscoCPDetectors.prototype = {
                     .done(async function (result) {
                         await self.RiscoSession.getCPStates();
                         await self.getRefreshState(callback);
-                        self.log.debug('Detector "' + self.name + '" => Actual Motion state is: (' + self.RiscoDetectorState + ')');
-                        self.log.debug('Detector "' + self.name + '" => Actual Active state is: (' + self.RiscoDetectorActiveState + ')');
+                        self.log.debug(self.sPrefix +' "' + self.name + '" => Actual Motion state is: (' + self.RiscoDetectorState + ')');
+                        self.log.debug(self.sPrefix +' "' + self.name + '" => Actual Active state is: (' + self.RiscoDetectorActiveState + ')');
                         self.DetectorReady = true;
-                        self.detectorService.setCharacteristic(self.Characteristic.MotionDetected, self.RiscoDetectorState);
-                        self.detectorService.setCharacteristic(self.Characteristic.StatusActive, self.RiscoDetectorActiveState);
+                        self.detectorService.setCharacteristic(self.getCharacterisitcOfDetector(), self.RiscoDetectorState);
+                        if (self.Type == 'Detector'){
+                            self.detectorService.setCharacteristic(self.Characteristic.StatusActive, self.RiscoDetectorActiveState);
+                        }
                         return
                     });
             }
         } catch (err) {
             self.log.error(err);
-            self.detectorService.setCharacteristic(self.Characteristic.MotionDetected, self.RiscoDetectorState);
-            self.detectorService.setCharacteristic(self.Characteristic.StatusActive, self.RiscoDetectorActiveState);
+            self.detectorService.setCharacteristic(self.getCharacterisitcOfDetector(), self.RiscoDetectorState);
+            if (self.Type == 'Detector'){
+                self.detectorService.setCharacteristic(self.Characteristic.StatusActive, self.RiscoDetectorActiveState);
+            }
             callback(null, [self.RiscoDetectorState, self.RiscoDetectorActiveState]);
             return
         }
@@ -700,7 +766,7 @@ RiscoCPDetectors.prototype = {
         var self = this;
         if (self.DetectorReady){
             state = (state) ? false : true;
-            self.log.debug('Set Active Detector "' +self.name +'" to: ' +  state);
+            self.log.debug('Set Active ' + self.sPrefix +' "' +self.name +'" to: ' +  state);
             var SBpResp;
             self.log.info(self.name + ' Actual State: ' + self.RiscoDetectorActiveState);
             self.log.info(self.name + ' New State: ' + state);
@@ -713,7 +779,7 @@ RiscoCPDetectors.prototype = {
             }
             if (SBpResp){
                 if (!self.polling){
-                    self.log.info('Detector "' + self.name + '" => Set new Bypass state: (' + state + ')');
+                    self.log.info(self.sPrefix +' "' + self.name + '" => Set new Bypass state: (' + state + ')');
                 }
                 typeof callback === 'function' && callback(null, [self.RiscoDetectorState, self.RiscoDetectorActiveState]);
             } else {
