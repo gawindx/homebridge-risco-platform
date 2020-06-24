@@ -83,7 +83,7 @@ For the moment (v1.0.2), it is only possible to indicate if the real type of the
 - Window contact
 
 If no accessory is generated, the system mode operation will be set by default.
-```
+
 
 ## How to Identify the ID of a Detector
 
@@ -102,10 +102,11 @@ In this case, you just have to restart homebridge and you will have access to th
 When the plugin is launched, the information is disseminated and can be read directly in the logs (in real time or via the web interface).
 
 Locate the lines resembling these to directly obtain the Id to use in the config.json file:
->Add Accessory => Add Detectors
->Add Accessory => Configuration for Detectors Id : 0 and labeled "Batiment"
->Add Accessory => Configuration for Detectors Id : 1 and labeled "Pte Garage"
-
+```
+Add Accessory => Add Detectors
+Add Accessory => Configuration for Detectors Id : 0 and labeled "Batiment"
+Add Accessory => Configuration for Detectors Id : 1 and labeled "Pte Garage"
+```
 
 ## How to get your riscoSiteId
 
