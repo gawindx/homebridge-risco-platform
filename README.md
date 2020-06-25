@@ -78,7 +78,7 @@ Fields:
         * "0,1,...": will modify a list of Detecor to Windows.
         Accepts a comma-separated list of string where each member is the id of a Detector
 
-For the moment (v1.0.2), it is only possible to indicate if the real type of the detector is:
+For the moment (v1.0.4), it is only possible to indicate if the real type of the detector is:
 - Door contact
 - Window contact
 
