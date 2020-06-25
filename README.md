@@ -90,11 +90,15 @@ If no accessory is generated, the system mode operation will be set by default.
 ### Method 1 : You know the configuration of your system
 In this case it is very simple.
 Just take the zone number and remove 1.
+
 Example:
+
+```
 Zone 1 at Id 0
 Zone 10 Id 9
 Zone 32 at Id 31
 etc ...
+```
 
 ### Method 2 : You do not know the configuration of your system.
 
