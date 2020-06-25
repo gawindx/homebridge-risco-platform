@@ -212,11 +212,10 @@ function RiscoCPDetectors(log, accConfig, homebridge) {
         case 'Door':
             this.detectorService = new this.Service.Door(this.name);
             this.detectorService
-                .getCharacteristic(this.Characteristic.CurrentDoorState)
+                .getCharacteristic(this.Characteristic.CurrentPosition)
                 .on('get', this.getCurrentState.bind(this));
-
             /*
-            The following seems incompatible with the 'hom' Apple 'application and generates warnings from Homekit 
+            The following seems incompatible with the 'home Apple' application and generates warnings from Homekit 
             this.detectorService
                 .getCharacteristic(this.Characteristic.StatusActive)
                 .on('set', this.setCurrentState.bind(this));*/
@@ -226,11 +225,10 @@ function RiscoCPDetectors(log, accConfig, homebridge) {
         case 'Window':
             this.detectorService = new this.Service.Window(this.name);
             this.detectorService
-                .getCharacteristic(this.Characteristic.CurrentDoorState)
+                .getCharacteristic(this.Characteristic.CurrentPosition)
                 .on('get', this.getCurrentState.bind(this));
-
             /*
-            The following seems incompatible with the 'hom' Apple 'application and generates warnings from Homekit 
+            The following seems incompatible with the 'home Apple' application and generates warnings from Homekit 
             this.detectorService
                 .getCharacteristic(this.Characteristic.StatusActive)
                 .on('set', this.setCurrentState.bind(this));*/
@@ -276,14 +274,11 @@ function RiscoCPDetectors(log, accConfig, homebridge) {
 
         emitter.on(self.long_event_name, function (state) {
 
-            self.log.info(self.sPrefix +' "' + self.name + '" => New state detected: (' + state[0] + '). Notify!');
-            self.RiscoDetectorState = state[0];
-            self.detectorService.setCharacteristic(self.getCharacterisitcOfDetector(), self.RiscoDetectorState);
-            self.log.info(self.sPrefix +' "' + self.name + '" => New Active state detected (Not Bypassed=true) : (' + state[1] + '). Notify!');
-            self.RiscoDetectorActiveState = state[1];
+            self.log.info(self.sPrefix +' "' + self.name + '" => New state detected: (' + self.GetAccessoryState(state[0], false) + '). Notify!');
             if (self.Type == 'Detector'){
-                self.detectorService.setCharacteristic(self.Characteristic.StatusActive, self.RiscoDetectorActiveState);
+                self.log.info(self.sPrefix +' "' + self.name + '" => New Active state detected (Not Bypassed=true) : (' + state[1] + '). Notify!');
             }
+            self.ReportAccessoryState(state);
         });
 
         emitter.on("err", function (err) {
@@ -682,17 +677,71 @@ RiscoCPOutputs.prototype = {
 };
 
 RiscoCPDetectors.prototype = {
-    getCharacterisitcOfDetector(){
+    ReportAccessoryState(state = null){
+        var self = this;
+        if (!state){
+            self.RiscoDetectorState = state[0];
+            self.RiscoDetectorActiveState = state[1];
+        }
+        try{
+            switch (self.Type){
+                case 'Detector':
+                    self.detectorService.setCharacteristic(self.Characteristic.MotionDetected, self.GetAccessoryState(self.RiscoDetectorState));
+                    self.detectorService.setCharacteristic(self.Characteristic.StatusActive, self.RiscoDetectorActiveState);
+                    return
+                case 'Door':
+                    self.detectorService.setCharacteristic(self.Characteristic.CurrentPosition, self.GetAccessoryState(self.RiscoDetectorState));
+                    self.detectorService.setCharacteristic(self.Characteristic.TargetPosition, self.GetAccessoryState(self.RiscoDetectorState));
+                    return
+                case 'Window':
+                    self.detectorService.setCharacteristic(self.Characteristic.CurrentPosition, self.GetAccessoryState(self.RiscoDetectorState));
+                    self.detectorService.setCharacteristic(self.Characteristic.TargetPosition, self.GetAccessoryState(self.RiscoDetectorState));
+                    return
+                default:
+                    self.detectorService.setCharacteristic(self.Characteristic.MotionDetected, self.GetAccessoryState(self.RiscoDetectorState));
+                    self.detectorService.setCharacteristic(self.Characteristic.StatusActive, self.RiscoDetectorActiveState);
+                    return
+            }
+        } catch(err){
+            self.log.error(err);
+            return
+        }
+    },
+
+    GetAccessoryState(state, AsHomeKitValue = true){
+        /*
+        Adapt the status of the accessory according to the response expected by Homekit according to the type of accessory
+        */
         var self = this;
         switch (self.Type){
             case 'Detector':
-                return self.Characteristic.MotionDetected;
+                if (AsHomeKitValue){
+                    return ((state) ? true : false);
+                } else {
+                    return ((state) ? 'Active' : 'Inactive');
+                }
+                break;
             case 'Door':
-                return self.Characteristic.CurrentDoorState;
+                if (AsHomeKitValue){
+                    return ((state) ? 100 : 0);
+                } else {
+                    return ((state) ? 'open' : 'closed');
+                }
+                break;
             case 'Window':
-                return self.Characteristic.CurrentDoorState;
+                if (AsHomeKitValue){
+                    return ((state) ? 100 : 0);
+                } else {
+                    newstate = ((state) ? 'open' : 'closed');
+                }
+                break;
             default:
-                return self.Characteristic.MotionDetected;
+                if (AsHomeKitValue){
+                    return ((state) ? true : false);
+                } else {
+                    return ((state) ? 'Active' : 'Inactive');
+                }
+                break;
         }
     },
 
@@ -727,8 +776,8 @@ RiscoCPDetectors.prototype = {
         var self = this;
         try{
             if (self.polling){
-                self.log.debug(self.sPrefix +' "' + self.name + '"" MotionDetected: '+ self.RiscoDetectorState);
-                self.log.debug(self.sPrefix +' "' + self.name + '"" is Active:'+ self.RiscoDetectorActiveState);
+                self.log.debug(self.sPrefix +' "' + self.name + '" MotionDetected : '+ self.GetAccessoryState(self.RiscoDetectorState, false));
+                self.log.debug(self.sPrefix +' "' + self.name + '" is Active (Not Bypassed=true) :'+ self.RiscoDetectorActiveState);
                 callback(null, [self.RiscoDetectorState, self.RiscoDetectorActiveState]);
             } else {
                 self.log.info(self.sPrefix +' "' + self.name + '" =>Getting current state - delayed...');
@@ -741,22 +790,16 @@ RiscoCPDetectors.prototype = {
                     .done(async function (result) {
                         await self.RiscoSession.getCPStates();
                         await self.getRefreshState(callback);
-                        self.log.debug(self.sPrefix +' "' + self.name + '" => Actual Motion state is: (' + self.RiscoDetectorState + ')');
-                        self.log.debug(self.sPrefix +' "' + self.name + '" => Actual Active state is: (' + self.RiscoDetectorActiveState + ')');
+                        self.log.debug(self.sPrefix +' "' + self.name + '" => Actual Motion state is : (' + self.GetAccessoryState(self.RiscoDetectorState, false) + ')');
+                        self.log.debug(self.sPrefix +' "' + self.name + '" => Actual Active (Not Bypassed=true) is : (' + self.RiscoDetectorActiveState + ')');
                         self.DetectorReady = true;
-                        self.detectorService.setCharacteristic(self.getCharacterisitcOfDetector(), self.RiscoDetectorState);
-                        if (self.Type == 'Detector'){
-                            self.detectorService.setCharacteristic(self.Characteristic.StatusActive, self.RiscoDetectorActiveState);
-                        }
+                        self.ReportAccessoryState();
                         return
                     });
             }
         } catch (err) {
             self.log.error(err);
-            self.detectorService.setCharacteristic(self.getCharacterisitcOfDetector(), self.RiscoDetectorState);
-            if (self.Type == 'Detector'){
-                self.detectorService.setCharacteristic(self.Characteristic.StatusActive, self.RiscoDetectorActiveState);
-            }
+            self.ReportAccessoryState();
             callback(null, [self.RiscoDetectorState, self.RiscoDetectorActiveState]);
             return
         }
@@ -764,12 +807,14 @@ RiscoCPDetectors.prototype = {
 
     async setCurrentState(state, callback) {
         var self = this;
-        if (self.DetectorReady){
+        if ((self.DetectorReady) && (self.Type == 'Detector')){
             state = (state) ? false : true;
-            self.log.debug('Set Active ' + self.sPrefix +' "' +self.name +'" to: ' +  state);
+            self.log.debug('Set Active ' + self.sPrefix +' "' + self.name +'" to: ' + state);
             var SBpResp;
             self.log.info(self.name + ' Actual State: ' + self.RiscoDetectorActiveState);
-            self.log.info(self.name + ' New State: ' + state);
+            if (self.Type == 'Detector'){
+                self.log.info(self.name + ' New State: ' + state);
+            }
             if (self.RiscoDetectorActiveState != state) {
                 SBpResp = true;
                 self.log.info(self.name + ' Identical State');
