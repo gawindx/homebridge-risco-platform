@@ -732,7 +732,7 @@ RiscoCPDetectors.prototype = {
                 if (AsHomeKitValue){
                     return ((state) ? 100 : 0);
                 } else {
-                    newstate = ((state) ? 'open' : 'closed');
+                    return ((state) ? 'open' : 'closed');
                 }
                 break;
             default:
