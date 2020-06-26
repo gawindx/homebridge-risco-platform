@@ -70,15 +70,15 @@ Fields:
 * "Custom" => optional: Addition of Custom function. accept the following options
     Allows you to modify the type of detector (no distinction between motion detector and another type of detector at the RiscoCloud interface)
     * "Door"=> optional: accept the following options
-        * "all": will modify all Detecor to Door Contact
-        * "0,1,...": will modify a list of Detecor to Door Contact.
+        * "all": will modify all Detector to Door Contact
+        * "0,1,...": will modify a list of Detector to Door Contact.
         Accepts a comma-separated list of string where each member is the id of a Detector
     * "Window"=> optional: accept the following options
-        * "all": will modify all Detecor to Windows
-        * "0,1,...": will modify a list of Detecor to Windows.
+        * "all": will modify all Detector to Windows
+        * "0,1,...": will modify a list of Detector to Windows.
         Accepts a comma-separated list of string where each member is the id of a Detector
 
-For the moment (v1.0.2), it is only possible to indicate if the real type of the detector is:
+For the moment (v1.0.4), it is only possible to indicate if the real type of the detector is:
 - Door contact
 - Window contact
 
@@ -90,11 +90,15 @@ If no accessory is generated, the system mode operation will be set by default.
 ### Method 1 : You know the configuration of your system
 In this case it is very simple.
 Just take the zone number and remove 1.
+
 Example:
+
+```
 Zone 1 at Id 0
 Zone 10 Id 9
 Zone 32 at Id 31
 etc ...
+```
 
 ### Method 2 : You do not know the configuration of your system.
 
