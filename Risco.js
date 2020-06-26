@@ -72,14 +72,19 @@ RiscoPanelSession.prototype = {
     },
 
     IsValidResponse(response, functionName){
-        var self = this;
-        if (response.data.error != "0"){
-            self.log.debug('Got Invalid RiscoCloud\'s Response from ' + functionName + '. Retry...');
-            self.log.debug('Bad response :' + JSON.stringify(response));
+    	try {
+	        var self = this;
+    	    if (response.data.error != "0"){
+        	    self.log.debug('Got Invalid RiscoCloud\'s Response from ' + functionName + '. Retry...');
+            	self.log.debug('Bad response :' + JSON.stringify(response.data));
+            	return false
+        	} else {
+            	self.log.debug('Got Valid RiscoCloud\'s Response from ' + functionName + '. Continue...');
+            	return true
+        	}
+        } catch (err) {
+            self.log.error('Error on IsValidResponse : ' + err);
             return false
-        } else {
-            self.log.debug('Got Valid RiscoCloud\'s Response from ' + functionName + '. Continue...');
-            return true
         }
     },
 
