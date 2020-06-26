@@ -71,6 +71,18 @@ RiscoPanelSession.prototype = {
         return self.SessionLogged;
     },
 
+    IsValidResponse(response, functionName){
+        var self = this;
+        if (response.data.error != "0"){
+            self.log.debug('Got Invalid RiscoCloud\'s Response from ' + functionName + '. Retry...');
+            self.log.debug('Bad response :' + JSON.stringify(Devices));
+            return false
+        } else {
+            self.log.debug('Got Valid RiscoCloud\'s Response from ' + functionName + '. Continue...');
+            return true
+        }
+    },
+
     async login() {
         var self = this;
         self.log.debug('Entering Login Function');
@@ -202,21 +214,24 @@ RiscoPanelSession.prototype = {
         var self = this;
         self.log.debug('Check User Code expiration');
         try {
-            const response = await axios({
-                url: 'https://www.riscocloud.com/ELAS/WebUI/SystemSettings/IsUserCodeExpired',
-                method: 'POST',
-                headers: {
-                    'Referer': 'https://www.riscocloud.com/ELAS/WebUI/MainPage/MainPage',
-                    'Origin': 'https://www.riscocloud.com',
-                    'Cookie': self.riscoCookies
-                },
-                data: {},
+            var response
+            do {
+                response = await axios({
+                    url: 'https://www.riscocloud.com/ELAS/WebUI/SystemSettings/IsUserCodeExpired',
+                    method: 'POST',
+                    headers: {
+                        'Referer': 'https://www.riscocloud.com/ELAS/WebUI/MainPage/MainPage',
+                        'Origin': 'https://www.riscocloud.com',
+                        'Cookie': self.riscoCookies
+                    },
+                    data: {},
 
-                validateStatus(status) {
-                    return status >= 200 && status < 400;
-                },
-                maxRedirects: 0,
-            });
+                    validateStatus(status) {
+                        return status >= 200 && status < 400;
+                    },
+                    maxRedirects: 0,
+                });
+            } while (!(self.IsValidResponse(response, "IsUserCodeExpired")))
 
             if (response.status == 200) {
                 self.log.debug('User Code Expired ? ' + response.data.pinExpired );
@@ -234,23 +249,26 @@ RiscoPanelSession.prototype = {
         self.log.debug('User Code Validation');
         try {
             const post_data = 'code=' + self.risco_pincode;
-            const response = await axios({
-                url: 'https://www.riscocloud.com/ELAS/WebUI/SystemSettings/ValidateUserCode',
-                method: 'POST',
-                headers: {
-                    'Referer': 'https://www.riscocloud.com/ELAS/WebUI/MainPage/MainPage',
-                    'Origin': 'https://www.riscocloud.com',
-                    'Cookie': self.riscoCookies,
-                    'Content-Length': post_data.length,
-                    'Content-type': 'application/x-www-form-urlencoded'
-                },
-                data: post_data,
+            var response;
+            do {
+                response = await axios({
+                    url: 'https://www.riscocloud.com/ELAS/WebUI/SystemSettings/ValidateUserCode',
+                    method: 'POST',
+                    headers: {
+                        'Referer': 'https://www.riscocloud.com/ELAS/WebUI/MainPage/MainPage',
+                        'Origin': 'https://www.riscocloud.com',
+                        'Cookie': self.riscoCookies,
+                        'Content-Length': post_data.length,
+                        'Content-type': 'application/x-www-form-urlencoded'
+                    },
+                    data: post_data,
 
-                validateStatus(status) {
-                    return status >= 200 && status < 400;
-                },
-                maxRedirects: 0,
-            });
+                    validateStatus(status) {
+                        return status >= 200 && status < 400;
+                    },
+                    maxRedirects: 0,
+                });
+            } while (!(self.IsValidResponse(response, "ValidateUserCode")))
 
             if (response.status ==200) {
                 if (response.data.error == 14) {
@@ -284,21 +302,25 @@ RiscoPanelSession.prototype = {
                 if (self.req_counter > 10) {
                     self.log.debug('Reset counter and launch function KeepAlive');
                     self.req_counter = 0;
-                    const response = await axios({
-                        url: 'https://www.riscocloud.com/ELAS/WebUI/Security/GetCPState?userIsAlive=true',
-                        method: 'POST',
-                        headers: {
-                            'Referer': 'https://www.riscocloud.com/ELAS/WebUI/MainPage/MainPage',
-                            'Origin': 'https://www.riscocloud.com',
-                            'Cookie': self.riscoCookies,
-                        },
-                        data: {},
+                    var response;
 
-                        validateStatus(status) {
-                            return status >= 200 && status < 400;
-                        },
-                        maxRedirects: 0,
-                    });
+                    do {
+                        response = await axios({
+                            url: 'https://www.riscocloud.com/ELAS/WebUI/Security/GetCPState?userIsAlive=true',
+                            method: 'POST',
+                            headers: {
+                                'Referer': 'https://www.riscocloud.com/ELAS/WebUI/MainPage/MainPage',
+                                'Origin': 'https://www.riscocloud.com',
+                                'Cookie': self.riscoCookies,
+                            },
+                            data: {},
+
+                            validateStatus(status) {
+                                return status >= 200 && status < 400;
+                            },
+                            maxRedirects: 0,
+                        });
+                    } while (!(self.IsValidResponse(response, "KeepAlive")))
 
                     if ( (response.headers['Location'] == '/ELAS/WebUI/UserLogin/SessionExpired') || (response.data.error == 3)) {
                         self.SessionLogged = false;
@@ -344,30 +366,31 @@ RiscoPanelSession.prototype = {
 
             var response;
             const post_data = {};
-            response = await axios({
-                url: risco_Part_API_url,
-                method: 'POST',
-                headers: {
-                    Referer: 'https://www.riscocloud.com/ELAS/WebUI/MainPage/MainPage',
-                    Origin: 'https://www.riscocloud.com',
-                    Cookie: self.riscoCookies
-                },
-                data: {},
 
-                validateStatus(status) {
-                    return status >= 200 && status < 400;
-                },
-                maxRedirects: 0,
-            });
+            do {
+                response = await axios({
+                    url: risco_Part_API_url,
+                    method: 'POST',
+                    headers: {
+                        Referer: 'https://www.riscocloud.com/ELAS/WebUI/MainPage/MainPage',
+                        Origin: 'https://www.riscocloud.com',
+                        Cookie: self.riscoCookies
+                    },
+                    data: {},
+
+                    validateStatus(status) {
+                        return status >= 200 && status < 400;
+                    },
+                    maxRedirects: 0,
+                });
+            } while (!(self.IsValidResponse(response, "DiscoverParts")))
 
             if (response.status == 200) {
 
                 const body = response.data;
-
                 var Parts_Datas = {};
 
                 if (self.Partition == 'system') {
-                    Parts_Datas.type = 'system';
                     var Part_Data = {
                         id: 0,
                         name: self.risco_panel_name,
@@ -639,20 +662,22 @@ RiscoPanelSession.prototype = {
             await self.KeepAlive();
 
             var response;
-            response = await axios({
-                url: 'https://www.riscocloud.com/ELAS/WebUI/Detectors/Get',
-                method: 'POST',
-                headers: {
-                    Referer: 'https://www.riscocloud.com/ELAS/WebUI/MainPage/MainPage',
-                    Origin: 'https://www.riscocloud.com',
-                    Cookie: self.riscoCookies
-                },
+            do {
+                response = await axios({
+                    url: 'https://www.riscocloud.com/ELAS/WebUI/Detectors/Get',
+                    method: 'POST',
+                    headers: {
+                        Referer: 'https://www.riscocloud.com/ELAS/WebUI/MainPage/MainPage',
+                        Origin: 'https://www.riscocloud.com',
+                        Cookie: self.riscoCookies
+                    },
 
-                validateStatus(status) {
-                    return status >= 200 && status < 400;
-                },
-                maxRedirects: 0,
-            }); 
+                    validateStatus(status) {
+                        return status >= 200 && status < 400;
+                    },
+                    maxRedirects: 0,
+                }); 
+            } while (!(self.IsValidResponse(response, "DiscoverDetectors")))
 
             if (response.status == 200){
                 self.log.debug('Detectors/Get status: ' + response.status);
@@ -741,20 +766,22 @@ RiscoPanelSession.prototype = {
             await self.KeepAlive();
 
             var response;
-            response = await axios({
-                url: 'https://www.riscocloud.com/ELAS/WebUI/Cameras/Get',
-                method: 'POST',
-                headers: {
-                    Referer: 'https://www.riscocloud.com/ELAS/WebUI/MainPage/MainPage',
-                    Origin: 'https://www.riscocloud.com',
-                    Cookie: self.riscoCookies
-                },
+            do {
+                response = await axios({
+                    url: 'https://www.riscocloud.com/ELAS/WebUI/Cameras/Get',
+                    method: 'POST',
+                    headers: {
+                        Referer: 'https://www.riscocloud.com/ELAS/WebUI/MainPage/MainPage',
+                        Origin: 'https://www.riscocloud.com',
+                        Cookie: self.riscoCookies
+                    },
 
-                validateStatus(status) {
-                    return status >= 200 && status < 400;
-                },
-                maxRedirects: 0,
-            });            
+                    validateStatus(status) {
+                        return status >= 200 && status < 400;
+                    },
+                    maxRedirects: 0,
+                });            
+            } while (!(self.IsValidResponse(response, "DiscoverCameras")))
 
             if (response.status == 200){
                 self.log.debug('Cameras/Get status: ' + response.status);
@@ -782,45 +809,6 @@ RiscoPanelSession.prototype = {
             self.log.error(err);
         }
     },
-/*
-    async getOverview() {
-        var self = this;
-        try {
-            await self.KeepAlive();
-
-            var response;
-            const post_data = {};
-            response = await axios({
-                url: 'https://www.riscocloud.com/ELAS/WebUI/Overview/Get',
-                method: 'POST',
-                headers: {
-                    Referer: 'https://www.riscocloud.com/ELAS/WebUI/MainPage/MainPage',
-                    Origin: 'https://www.riscocloud.com',
-                    Cookie: self.riscoCookies
-                },
-                data: {},
-
-                validateStatus(status) {
-                    return status >= 200 && status < 400;
-                },
-                maxRedirects: 0,
-            });
-
-            if (response.status == 200) {
-                const body = response.data;
-                for (var PartId in body.detectors.parts) {
-                    const Id = body.detectors.parts[PartId].id
-                    self.DiscoveredAccessories.partitions[Id].previousState = self.DiscoveredAccessories.partitions[Id].actualState;
-                    self.DiscoveredAccessories.partitions[Id].actualState = (body.detectors.parts[PartId].armIcon).match(/ico-(.*)\.png/)[1];
-                }
-            } else {
-                throw new Error('Cannot Retrieve Partitions States');
-            }
-        } catch (err) {
-            self.log.error('Error on Get Partitions States : ' + err);
-        }
-    },
-*/
 
     async getAlarmState(body) {
         var self = this;
@@ -1068,21 +1056,24 @@ RiscoPanelSession.prototype = {
                 self.log.debug('RiscoPanelSession is Ready');
                 if (KA_rslt === null){
                     self.log.debug('KeepAlive does not signal a change or has not been tested.');
-                    const response = await axios({
-                        url: 'https://www.riscocloud.com/ELAS/WebUI/Security/GetCPState',
-                        method: 'POST',
-                        headers: {
-                            Referer: 'https://www.riscocloud.com/ELAS/WebUI/MainPage/MainPage',
-                            Origin: 'https://www.riscocloud.com',
-                            Cookie: self.riscoCookies
-                        },
-                        data: {},
+                    var response;
+                    do {
+                        response = await axios({
+                            url: 'https://www.riscocloud.com/ELAS/WebUI/Security/GetCPState',
+                            method: 'POST',
+                            headers: {
+                                Referer: 'https://www.riscocloud.com/ELAS/WebUI/MainPage/MainPage',
+                                Origin: 'https://www.riscocloud.com',
+                                Cookie: self.riscoCookies
+                            },
+                            data: {},
 
-                        validateStatus(status) {
-                            return status >= 200 && status < 400;
-                        },
-                        maxRedirects: 0,
-                    });
+                            validateStatus(status) {
+                                return status >= 200 && status < 400;
+                            },
+                            maxRedirects: 0,
+                        });
+                    } while (!(self.IsValidResponse(response, "getCPStates")))
                     if (response.status == 200) {
                         body = response.data;
                         if (response.data.eh != null) {
@@ -1161,22 +1152,25 @@ RiscoPanelSession.prototype = {
                 targetPasscode = "------"
             }
 
-            const response = await axios({
-                url: 'https://www.riscocloud.com/ELAS/WebUI/Security/ArmDisarm',
-                method: 'POST',
-                headers: {
-                    Referer: 'https://www.riscocloud.com/ELAS/WebUI/MainPage/MainPage',
-                    Origin: 'https://www.riscocloud.com',
-                    Cookie: self.riscoCookies,
-                    'Content-type': 'application/x-www-form-urlencoded'
-                },
-                data: 'type=' + targetType + '&passcode=' + targetPasscode + '&bypassZoneId=-1',
+            var response;
+            do {
+                response = await axios({
+                    url: 'https://www.riscocloud.com/ELAS/WebUI/Security/ArmDisarm',
+                    method: 'POST',
+                    headers: {
+                        Referer: 'https://www.riscocloud.com/ELAS/WebUI/MainPage/MainPage',
+                        Origin: 'https://www.riscocloud.com',
+                        Cookie: self.riscoCookies,
+                        'Content-type': 'application/x-www-form-urlencoded'
+                    },
+                    data: 'type=' + targetType + '&passcode=' + targetPasscode + '&bypassZoneId=-1',
 
-                validateStatus(status) {
-                    return status >= 200 && status < 400;
-                },
-                maxRedirects: 0,
-            });
+                    validateStatus(status) {
+                        return status >= 200 && status < 400;
+                    },
+                    maxRedirects: 0,
+                });
+            } while (!(self.IsValidResponse(response, "armDisarm")))
 
             if (response.status == 200){
                 if (response.data.armFailures !== null ){
@@ -1215,22 +1209,25 @@ RiscoPanelSession.prototype = {
             var targetType = type;
             var targetdevId;
 
-            const response = await axios({
-                url: 'https://www.riscocloud.com/ELAS/WebUI/Automation/HACommand',
-                method: 'POST',
-                headers: {
-                    Referer: 'https://www.riscocloud.com/ELAS/WebUI/MainPage/MainPage',
-                    Origin: 'https://www.riscocloud.com',
-                    Cookie: self.riscoCookies,
-                    'Content-type': 'application/x-www-form-urlencoded'
-                },
-                data: 'type=' + targetType + '&devId=' + devId,
+            var response;
+            do {
+                response = await axios({
+                    url: 'https://www.riscocloud.com/ELAS/WebUI/Automation/HACommand',
+                    method: 'POST',
+                    headers: {
+                        Referer: 'https://www.riscocloud.com/ELAS/WebUI/MainPage/MainPage',
+                        Origin: 'https://www.riscocloud.com',
+                        Cookie: self.riscoCookies,
+                        'Content-type': 'application/x-www-form-urlencoded'
+                    },
+                    data: 'type=' + targetType + '&devId=' + devId,
 
-                validateStatus(status) {
-                    return status >= 200 && status < 400;
-                },
-                maxRedirects: 0,
-            });
+                    validateStatus(status) {
+                        return status >= 200 && status < 400;
+                    },
+                    maxRedirects: 0,
+                });
+            } while (!(self.IsValidResponse(response, "HACommand")))
 
             if (response.status == 200){
                 //response for pulse switch ok : {error: 0, haSwitch: [], devId: 2}
@@ -1259,22 +1256,25 @@ RiscoPanelSession.prototype = {
         try {
             await self.KeepAlive();
 
-            const response = await axios({
-                url: 'https://www.riscocloud.com/ELAS/WebUI/Detectors/SetBypass',
-                method: 'POST',
-                headers: {
-                    Referer: 'https://www.riscocloud.com/ELAS/WebUI/MainPage/MainPage',
-                    Origin: 'https://www.riscocloud.com',
-                    Cookie: self.riscoCookies,
-                    'Content-type': 'application/x-www-form-urlencoded'
-                },
-                data: 'id=' + devId + '&bypass=' + state,
+            var response;
+            do {
+                response = await axios({
+                    url: 'https://www.riscocloud.com/ELAS/WebUI/Detectors/SetBypass',
+                    method: 'POST',
+                    headers: {
+                        Referer: 'https://www.riscocloud.com/ELAS/WebUI/MainPage/MainPage',
+                        Origin: 'https://www.riscocloud.com',
+                        Cookie: self.riscoCookies,
+                        'Content-type': 'application/x-www-form-urlencoded'
+                    },
+                    data: 'id=' + devId + '&bypass=' + state,
 
-                validateStatus(status) {
-                    return status >= 200 && status < 400;
-                },
-                maxRedirects: 0,
-            });
+                    validateStatus(status) {
+                        return status >= 200 && status < 400;
+                    },
+                    maxRedirects: 0,
+                });
+            } while (!(self.IsValidResponse(response, "HACommand")))
 
             if (response.status == 200){
                 if (response.data.error != 0){

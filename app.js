@@ -1,7 +1,7 @@
 'use strict';
 var pollingtoevent = require('polling-to-event');
 
-var risco = require('./risco');
+var risco = require('./Risco');
 var riscoAccessory = require('./RiscoAccessories');
 
 var Accessory, Service, Characteristic, UUIDGen;
