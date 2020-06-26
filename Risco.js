@@ -75,7 +75,7 @@ RiscoPanelSession.prototype = {
         var self = this;
         if (response.data.error != "0"){
             self.log.debug('Got Invalid RiscoCloud\'s Response from ' + functionName + '. Retry...');
-            self.log.debug('Bad response :' + JSON.stringify(Devices));
+            self.log.debug('Bad response :' + JSON.stringify(response));
             return false
         } else {
             self.log.debug('Got Valid RiscoCloud\'s Response from ' + functionName + '. Continue...');
