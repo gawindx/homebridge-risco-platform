@@ -203,11 +203,13 @@ function RiscoCPDetectors(log, accConfig, homebridge) {
                 .getCharacteristic(this.Characteristic.MotionDetected)
                 .on('get', this.getCurrentState.bind(this));
 
+            /*this.detectorService
+                .getCharacteristic(this.Characteristic.Active)
+                .on('set', this.setCurrentState.bind(this));*/
             this.detectorService
                 .getCharacteristic(this.Characteristic.StatusActive)
                 .on('set', this.setCurrentState.bind(this));
             this.sPrefix = 'Detector';
-            this.log.debug('Create MotionDetected Detector case loop');
             break;
         case 'Door':
             this.detectorService = new this.Service.Door(this.name);
@@ -220,7 +222,6 @@ function RiscoCPDetectors(log, accConfig, homebridge) {
                 .getCharacteristic(this.Characteristic.StatusActive)
                 .on('set', this.setCurrentState.bind(this));*/
             this.sPrefix = 'Door Contact';
-            this.log.debug('Create Door Contact Detector case loop');
             break;
         case 'Window':
             this.detectorService = new this.Service.Window(this.name);
@@ -233,7 +234,6 @@ function RiscoCPDetectors(log, accConfig, homebridge) {
                 .getCharacteristic(this.Characteristic.StatusActive)
                 .on('set', this.setCurrentState.bind(this));*/
             this.sPrefix = 'Window Contact';
-            this.log.debug('Create Window Contact Detector case loop');
             break;
         default:
             this.detectorService = new this.Service.MotionSensor(this.name);
@@ -245,7 +245,6 @@ function RiscoCPDetectors(log, accConfig, homebridge) {
                 .getCharacteristic(this.Characteristic.StatusActive)
                 .on('set', this.setCurrentState.bind(this));
             this.sPrefix = 'Detector';
-            this.log.debug('Create MotionDetected Detector Default loop');
             break;
     }
 
@@ -688,6 +687,7 @@ RiscoCPDetectors.prototype = {
                 case 'Detector':
                     self.detectorService.setCharacteristic(self.Characteristic.MotionDetected, self.GetAccessoryState(self.RiscoDetectorState));
                     self.detectorService.setCharacteristic(self.Characteristic.StatusActive, self.RiscoDetectorActiveState);
+                    //self.detectorService.setCharacteristic(self.Characteristic.Active, self.RiscoDetectorActiveState);
                     return
                 case 'Door':
                     self.detectorService.setCharacteristic(self.Characteristic.CurrentPosition, self.GetAccessoryState(self.RiscoDetectorState));
@@ -811,16 +811,16 @@ RiscoCPDetectors.prototype = {
             state = (state) ? false : true;
             self.log.debug('Set Active ' + self.sPrefix +' "' + self.name +'" to: ' + state);
             var SBpResp;
-            self.log.info(self.name + ' Actual State: ' + self.RiscoDetectorActiveState);
+            self.log.debug(self.name + ' Actual State: ' + self.RiscoDetectorActiveState);
             if (self.Type == 'Detector'){
-                self.log.info(self.name + ' New State: ' + state);
+                self.log.debug(self.name + ' New State: ' + state);
             }
             if (self.RiscoDetectorActiveState != state) {
                 SBpResp = true;
-                self.log.info(self.name + ' Identical State');
+                self.log.debug(self.name + ' Identical State');
             } else {
                 SBpResp = await self.RiscoSession.SetBypass(((state) ? 1 : 0 ), self.RiscoDetectorId);
-                self.log.info(self.name + ' Different State');
+                self.log.debug(self.name + ' Different State');
             }
             if (SBpResp){
                 if (!self.polling){

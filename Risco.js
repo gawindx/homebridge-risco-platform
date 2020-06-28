@@ -33,6 +33,7 @@ function RiscoPanelSession(aConfig, aLog) {
     this.riscoCookies;
     this.SessionLogged = false;
     this.LastEvent = null;
+    this.BadResponseCounter = 0;
 
     this.long_event_name = 'RPS_long_' + (this.risco_panel_name.toLowerCase()).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ /g, '_');
 
@@ -42,9 +43,13 @@ function RiscoPanelSession(aConfig, aLog) {
     if (self.polling) {
         self.log.info('Starting polling with an interval of %s ms', self.pollInterval);
         emitter = pollingtoevent(function (done) {
-            self.getCPStates(function (err, result) {
-                done(err, result);
-            });
+            if ((self.Ready === true) && (self.SessionLogged)) {
+                self.getCPStates(function (err, result) {
+                    done(err, result);
+                });
+            } else {
+                done(null, null);
+            }
         }, {
                 longpollEventName: self.long_event_name,
                 longpolling: true,
@@ -71,19 +76,48 @@ RiscoPanelSession.prototype = {
         return self.SessionLogged;
     },
 
-    IsValidResponse(response, functionName){
-    	try {
-	        var self = this;
-    	    if (response.data.error != "0"){
-        	    self.log.debug('Got Invalid RiscoCloud\'s Response from ' + functionName + '. Retry...');
-            	self.log.debug('Bad response :' + JSON.stringify(response.data));
-            	return false
-        	} else {
-            	self.log.debug('Got Valid RiscoCloud\'s Response from ' + functionName + '. Continue...');
-            	return true
-        	}
+    async IsValidResponse(response, functionName, htmltest = true){
+        var self = this;
+        try {
+            if (htmltest == true){
+                if (response.data.error != 0){
+                    self.log.debug('Got Invalid RiscoCloud\'s Response from ' + functionName + '. Retry...');
+                    self.log.debug('Bad response : ' + JSON.stringify(response.data));
+                    ++self.BadResponseCounter;
+                    if (self.BadResponseCounter >= 5){
+                        self.SessionLogged = false;
+                        await self.login();
+                        self.BadResponseCounter = 0;
+                        throw new Error('Too many wrong consecutive answers. Possible connection problem. Consider the session to be disconnected.');   
+                    }
+                    return false
+                } else {
+                    self.BadResponseCounter = 0;
+                    self.log.debug('Got Valid RiscoCloud\'s Response from ' + functionName + '. Continue...');
+                    self.log.debug('Good Response : ' + JSON.stringify(response.data));
+                    return true
+                }
+            } else {
+                if (response.status == 302){
+                    self.log.debug('Got Invalid RiscoCloud\'s Response from ' + functionName + '. Retry...');
+                    self.log.debug('Bad response : ' + response.status);
+                    ++self.BadResponseCounter;
+                    if (self.BadResponseCounter >= 5){
+                        self.SessionLogged = false;
+                        await self.login();
+                        self.BadResponseCounter = 0;
+                        throw new Error('Too many wrong consecutive answers. Possible connection problem. Consider the session to be disconnected.');   
+                    }
+                    return false
+                } else {
+                    self.BadResponseCounter = 0;
+                    self.log.debug('Got Valid RiscoCloud\'s Response from ' + functionName + '. Continue...');
+                    self.log.debug('Good Response : ' + response.status);
+                    return true
+                }
+            }
         } catch (err) {
-            self.log.error('Error on IsValidResponse : ' + err);
+            self.log.error('Error on IsInvalidResponse : ' + err);
             return false
         }
     },
@@ -236,7 +270,7 @@ RiscoPanelSession.prototype = {
                     },
                     maxRedirects: 0,
                 });
-            } while (!(self.IsValidResponse(response, "IsUserCodeExpired")))
+            } while (self.IsValidResponse(response, "IsUserCodeExpired") == false)
 
             if (response.status == 200) {
                 self.log.debug('User Code Expired ? ' + response.data.pinExpired );
@@ -273,9 +307,9 @@ RiscoPanelSession.prototype = {
                     },
                     maxRedirects: 0,
                 });
-            } while (!(self.IsValidResponse(response, "ValidateUserCode")))
+            } while (self.IsValidResponse(response, "ValidateUserCode") == false)
 
-            if (response.status ==200) {
+            if (response.status == 200) {
                 if (response.data.error == 14) {
                     throw new Error('PinCode Error');
                 } else if (response.data.error == 0) {
@@ -325,7 +359,7 @@ RiscoPanelSession.prototype = {
                             },
                             maxRedirects: 0,
                         });
-                    } while (!(self.IsValidResponse(response, "KeepAlive")))
+                    } while (self.IsValidResponse(response, "KeepAlive") == false)
 
                     if ( (response.headers['Location'] == '/ELAS/WebUI/UserLogin/SessionExpired') || (response.data.error == 3)) {
                         self.SessionLogged = false;
@@ -388,7 +422,7 @@ RiscoPanelSession.prototype = {
                     },
                     maxRedirects: 0,
                 });
-            } while (!(self.IsValidResponse(response, "DiscoverParts")))
+            } while (self.IsValidResponse(response, "DiscoverParts") == false)
 
             if (response.status == 200) {
 
@@ -476,20 +510,22 @@ RiscoPanelSession.prototype = {
             await self.KeepAlive();
 
             var response;
-            response = await axios({
-                url: 'https://www.riscocloud.com/ELAS/WebUI/MainPage/MainPage',
-                method: 'GET',
-                headers: {
-                    Referer: 'https://www.riscocloud.com/ELAS/WebUI/MainPage/MainPage',
-                    Origin: 'https://www.riscocloud.com',
-                    Cookie: self.riscoCookies
-                },
+            do {
+                response = await axios({
+                    url: 'https://www.riscocloud.com/ELAS/WebUI/MainPage/MainPage',
+                    method: 'GET',
+                    headers: {
+                        Referer: 'https://www.riscocloud.com/ELAS/WebUI/MainPage/MainPage',
+                        Origin: 'https://www.riscocloud.com',
+                        Cookie: self.riscoCookies
+                    },
 
-                validateStatus(status) {
-                    return status >= 200 && status < 400;
-                },
-                maxRedirects: 0,
-            });
+                    validateStatus(status) {
+                        return status >= 200 && status < 400;
+                    },
+                    maxRedirects: 0,
+                });
+            } while (self.IsValidResponse(response, "DiscoverGroups", false) == false)
 
             if (response.status == 200){
                 self.log.debug('Groups Status: ' + response.status);
@@ -574,20 +610,22 @@ RiscoPanelSession.prototype = {
         try {
             await self.KeepAlive();
             var response;
-            response = await axios({
-                url: 'https://www.riscocloud.com/ELAS/WebUI/MainPage/MainPage',
-                method: 'GET',
-                headers: {
-                    Referer: 'https://www.riscocloud.com/ELAS/WebUI/MainPage/MainPage',
-                    Origin: 'https://www.riscocloud.com',
-                    Cookie: self.riscoCookies
-                },
+            do {
+                response = await axios({
+                    url: 'https://www.riscocloud.com/ELAS/WebUI/MainPage/MainPage',
+                    method: 'GET',
+                    headers: {
+                        Referer: 'https://www.riscocloud.com/ELAS/WebUI/MainPage/MainPage',
+                        Origin: 'https://www.riscocloud.com',
+                        Cookie: self.riscoCookies
+                    },
 
-                validateStatus(status) {
-                    return status >= 200 && status < 400;
-                },
-                maxRedirects: 0,
-            }); 
+                    validateStatus(status) {
+                        return status >= 200 && status < 400;
+                    },
+                    maxRedirects: 0,
+                }); 
+            } while (self.IsValidResponse(response, "DiscoverOutputs", false) == false)
 
             if (response.status == 200){
                 var OutputInfo = (function() { 
@@ -682,7 +720,7 @@ RiscoPanelSession.prototype = {
                     },
                     maxRedirects: 0,
                 }); 
-            } while (!(self.IsValidResponse(response, "DiscoverDetectors")))
+            } while (self.IsValidResponse(response, "DiscoverDetectors") == false)
 
             if (response.status == 200){
                 self.log.debug('Detectors/Get status: ' + response.status);
@@ -786,7 +824,7 @@ RiscoPanelSession.prototype = {
                     },
                     maxRedirects: 0,
                 });            
-            } while (!(self.IsValidResponse(response, "DiscoverCameras")))
+            } while (self.IsValidResponse(response, "DiscoverCameras") == false)
 
             if (response.status == 200){
                 self.log.debug('Cameras/Get status: ' + response.status);
@@ -1057,7 +1095,7 @@ RiscoPanelSession.prototype = {
         try{
             var body;
             const KA_rslt = await self.KeepAlive();
-            if ( (self.Ready === true ) && ( self.SessionLogged)) {
+            if ( (self.Ready === true) && (self.SessionLogged)) {
                 self.log.debug('RiscoPanelSession is Ready');
                 if (KA_rslt === null){
                     self.log.debug('KeepAlive does not signal a change or has not been tested.');
@@ -1078,7 +1116,8 @@ RiscoPanelSession.prototype = {
                             },
                             maxRedirects: 0,
                         });
-                    } while (!(self.IsValidResponse(response, "getCPStates")))
+                    } while (self.IsValidResponse(response, "getCPStates") == false)
+
                     if (response.status == 200) {
                         body = response.data;
                         if (response.data.eh != null) {
@@ -1175,7 +1214,7 @@ RiscoPanelSession.prototype = {
                     },
                     maxRedirects: 0,
                 });
-            } while (!(self.IsValidResponse(response, "armDisarm")))
+            } while (self.IsValidResponse(response, "armDisarm") == false)
 
             if (response.status == 200){
                 if (response.data.armFailures !== null ){
@@ -1232,7 +1271,7 @@ RiscoPanelSession.prototype = {
                     },
                     maxRedirects: 0,
                 });
-            } while (!(self.IsValidResponse(response, "HACommand")))
+            } while (self.IsValidResponse(response, "HACommand") == false)
 
             if (response.status == 200){
                 //response for pulse switch ok : {error: 0, haSwitch: [], devId: 2}
@@ -1279,7 +1318,7 @@ RiscoPanelSession.prototype = {
                     },
                     maxRedirects: 0,
                 });
-            } while (!(self.IsValidResponse(response, "HACommand")))
+            } while (self.IsValidResponse(response, "HACommand") == false)
 
             if (response.status == 200){
                 if (response.data.error != 0){
