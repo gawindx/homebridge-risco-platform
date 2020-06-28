@@ -5,8 +5,10 @@ When Polling option is enabled, Alarm state is refreshed in background, that mea
 
 # Installation
 
-1. Install homebridge using: npm install -g homebridge
-2. Install this plugin using: npm install -g homebridge-risco-platform
+1. Install homebridge using: 
+   `npm install -g homebridge`
+2. Install this plugin using:
+   `npm install -g homebridge-risco-platform`
 3. Update your configuration file. See sample config.json snippet below. 
 
 # Configuration
