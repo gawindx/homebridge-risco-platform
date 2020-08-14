@@ -15,7 +15,8 @@
             "Detectors": "all|none|0,1,2,....",
             "Custom": {
                 "Door": "all|0,1,2,....",
-                "Window": "all|0,1,2,...."
+                "Window": "all|0,1,2,....",
+                "Contact Sensor": "all|0,1,2,...."
             }
         }
     ]
