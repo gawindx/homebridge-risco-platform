@@ -3,6 +3,14 @@ Integration works only when proper Ethernet module is added to your Risco Unit a
 
 When Polling option is enabled, Alarm state is refreshed in background, that means when you open HomeApp - there is no delay to display RiscoAlarm status. It's retreived from cached value.
 
+Note:
+From version 1.1.0, homebridge-risco-platform is a dynamic platform.
+This change means that:
+- The accessories created are cached to be reused after each restart of Homebridge
+- A recharged accessory retains all its characteristics and remains associated with its scene or automation, so it is no longer necessary to reconfigure its automation as it was before
+- When modifying the platform configuration, the accessories are modified accordingly (modification of type or deletion if no longer used)
+- A deleted accessory must therefore be re-associated with its automations because it will have been deleted from the Homebridge accessories cache
+
 # Installation
 
 1. Install homebridge using: 

@@ -431,9 +431,11 @@ RiscoPanelSession.prototype = {
 
                 if (self.Partition == 'system') {
                     var Part_Data = {
-                        id: 0,
+                        Id: 0,
                         name: self.risco_panel_name,
+                        longName: 'part_0_' + (self.risco_panel_name.toLowerCase()).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ /g, '_'),
                         Required: 'system',
+                        accessorytype: 'System',
                         previousState: null,
                         actualState: (function(){
                             var armedZones = body.overview.partInfo.armedStr.split(' ');
@@ -457,9 +459,11 @@ RiscoPanelSession.prototype = {
                 } else {
                     for (var PartId in body.detectors.parts) {
                         var Part_Data = {
-                            id: body.detectors.parts[PartId].id,
+                            Id: body.detectors.parts[PartId].id,
                             name: body.detectors.parts[PartId].name,
+                            longName: 'part_' + body.detectors.parts[PartId].id + '_' + (body.detectors.parts[PartId].name.toLowerCase()).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ /g, '_'),
                             Required: null,
+                            accessorytype: 'Partitions',
                             ExitDelay: 0,
                             previousState: null,
                             actualState: (body.detectors.parts[PartId].armIcon).match(/ico-(.*)\.png/)[1],
@@ -479,7 +483,7 @@ RiscoPanelSession.prototype = {
                             const Required_Zones = self.Partition.split(',').map(function(item) {
                                 return parseInt(item, 10);
                             });
-                            if (Required_Zones.includes(Part_Data.id) !== false){
+                            if (Required_Zones.includes(Part_Data.Id) !== false){
                                 self.log.debug('Partitions "' + body.detectors.parts[PartId].name + '" Required');
                                 Part_Data.Required = true;
                             } else {
@@ -490,7 +494,7 @@ RiscoPanelSession.prototype = {
                             self.log.debug('No Partitions Required');
                             Part_Data.Required = false;
                         }
-                        Parts_Datas[Part_Data.id] = Part_Data;
+                        Parts_Datas[Part_Data.Id] = Part_Data;
                     }
                     Parts_Datas.type = 'partition';
                 }
@@ -541,10 +545,12 @@ RiscoPanelSession.prototype = {
                     var ParentPartList = response.data.match(/<label data-groups=".*">.*<.*OpenPartGroups.*?\)\'/gm);
 
                     for (var Group in Groups_list){
-                        var GroupName = Groups_list[Group].match(/<label for="actGrpItem\d">(.*?)<\/label>/s)[1];
+                        const GroupName = Groups_list[Group].match(/<label for="actGrpItem\d">(.*?)<\/label>/s)[1];
+                        const GroupId = parseInt(Groups_list[Group].match(/<label for="actGrpItem(\d)">/s)[1], 10);
                         var Group_Data = {
-                            id: parseInt(Groups_list[Group].match(/<label for="actGrpItem(\d)">/s)[1], 10),
+                            Id: GroupId,
                             name: 'Group ' + GroupName,
+                            longName: 'group_' + GroupId + '_' + (('Group ' + GroupName).toLowerCase()).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ /g, '_'),
                             parentPart: (function(){
                                 var resultArray = [];
                                 self.log('parentpart');
@@ -557,6 +563,7 @@ RiscoPanelSession.prototype = {
                                 return resultArray;
                             })(),
                             Required: null,
+                            accessorytype: 'Groups',
                             previousState: null,
                             actualState: (function() {
                                 var result_State = 'Disarmed';
@@ -571,7 +578,7 @@ RiscoPanelSession.prototype = {
                                 })(),
                             OnAlarm: false
                         };
-                        self.log.debug('Discovering Group : "' + Group_Data.name + '" with Id : ' + Group_Data.id);
+                        self.log.debug('Discovering Group : "' + Group_Data.name + '" with Id : ' + Group_Data.Id);
                         if (self.Groups == 'all') {
                             self.log.debug('All Groups Required');
                             Group_Data.Required = true;
@@ -581,7 +588,7 @@ RiscoPanelSession.prototype = {
                             const Required_Groups = self.Groups.split(',').map(function(item) {
                                 return parseInt(item, 10);
                             });
-                            if (Required_Groups.includes(Group_Data.id) !== false){
+                            if (Required_Groups.includes(Group_Data.Id) !== false){
                                 self.log.debug('Group "' + Group_Data.name + '" Required');
                                 Group_Data.Required = true;
                             } else {
@@ -590,7 +597,7 @@ RiscoPanelSession.prototype = {
                             }
                         }
 
-                        Groups_Datas[Group_Data.id] = Group_Data;
+                        Groups_Datas[Group_Data.Id] = Group_Data;
                     }
                     self.log.debug(JSON.stringify(Groups_Datas));
                     return Groups_Datas;
@@ -638,11 +645,15 @@ RiscoPanelSession.prototype = {
                     var Outputs_Datas = {};
                     for (var list in Output_list){
                         self.log.debug(Output_list[list]);
-                        var Output_Cmd = Output_list[list].match(/onclick="(.*?);/s)[1]
+                        const Output_Cmd = Output_list[list].match(/onclick="(.*?);/s)[1]
+                        const OutputId = Output_list[list].match(/id=".*?(\d*)"/s)[1];
+                        const OutputName = Output_list[list].match(/<.*[\d|e]">(.*)<\/[s|l]/)[1];
                         var Output_Data = {
-                            Id: Output_list[list].match(/id=".*?(\d*)"/s)[1],
-                            name: Output_list[list].match(/<.*[\d|e]">(.*)<\/[s|l]/)[1],
+                            Id: OutputId,
+                            name: OutputName,
+                            longName: 'out_' + OutputId + '_' + (OutputName.toLowerCase()).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ /g, '_'),
                             Required: null,
+                            accessorytype: 'Outputs',
                             Type: (function() {
                                     if (Output_Cmd.match(/(\d)\)$/) == null) {
                                         return 'pulse';
@@ -730,9 +741,15 @@ RiscoPanelSession.prototype = {
                     for (var Parts in response.data.detectors.parts){
                         for (var Detector in response.data.detectors.parts[Parts].detectors){
                             self.log.debug(JSON.stringify(response.data.detectors.parts[Parts].detectors[Detector]));
+                            const DetectorName = (function() {
+                                            var tmp_name = response.data.detectors.parts[Parts].detectors[Detector].name;
+                                            return tmp_name.replace(/&#(\d+);/g, function(match, dec) {
+                                                return String.fromCharCode(dec);
+                                            });
+                                })();
+                            const DetectorId = response.data.detectors.parts[Parts].detectors[Detector].id;
                             var Detector_Data = {
-                                Id: response.data.detectors.parts[Parts].detectors[Detector].id,
-                                Type: "Detector",
+                                Id: DetectorId,
                                 StatusActive: (function() {
                                             if (response.data.detectors.parts[Parts].detectors[Detector].bypassed === false){
                                                 return true;
@@ -743,12 +760,9 @@ RiscoPanelSession.prototype = {
                                 //type: response.data.detectors.parts[Parts].detectors[Detector].data_icon,
                                 Partition: Parts,
                                 Required: null,
-                                name: (function() {
-                                            var tmp_name = response.data.detectors.parts[Parts].detectors[Detector].name;
-                                            return tmp_name.replace(/&#(\d+);/g, function(match, dec) {
-                                                return String.fromCharCode(dec);
-                                            });
-                                })(),
+                                accessorytype: "Detector",
+                                name: DetectorName,
+                                longName: 'det_' + DetectorId + '_' + (DetectorName.toLowerCase()).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ /g, '_'),
                                 State: (function() {
                                             //'detector' for inactive
                                             //'detector2' for active
@@ -834,12 +848,12 @@ RiscoPanelSession.prototype = {
                     for (var Camera in response.data.cameras.camInfo){
                         self.log.debug(JSON.stringify(response.data.cameras.camInfo[Camera]));
                         var Camera_Data = {
-                                id: response.data.cameras.camInfo[Camera].id,
+                                Id: response.data.cameras.camInfo[Camera].id,
                                 name: response.data.cameras.camInfo[Camera].title,
                                 lastcapture: response.data.cameras.camInfo[Camera].photoSrc,
                                 isNet: response.data.cameras.camInfo[Camera].isNet,
                             };
-                            Cameras_Datas[Camera_Data.id] = Camera_Data;
+                            Cameras_Datas[Camera_Data.Id] = Camera_Data;
                         }
                     return Cameras_Datas;
                 })();
@@ -858,8 +872,8 @@ RiscoPanelSession.prototype = {
         self.log.debug('Entering VerifyAlarmState function');
         try {
             if (body.OngoingAlarm == true) {
-                if (self.DiscoveredAccessories.partitions.type == 'system'){
-                    self.DiscoveredAccessories.partitions[0].OnAlarm = true;
+                if (self.DiscoveredAccessories.Partitions.type == 'system'){
+                    self.DiscoveredAccessories.Partitions[0].OnAlarm = true;
                 } else {
                     var ZIdAlarm = [];
                     var PIdAlarm = [];
@@ -909,16 +923,16 @@ RiscoPanelSession.prototype = {
                             })());
                         }
                         if ((this.Partition || 'none') != 'none') {
-                            var Partitions = JSON.parse(JSON.stringify(self.DiscoveredAccessories.partitions));
-                            Object.values(Partitions).filter(partition => PIdAlarm.includes(partition.id))
+                            var Partitions = JSON.parse(JSON.stringify(self.DiscoveredAccessories.Partitions));
+                            Object.values(Partitions).filter(partition => PIdAlarm.includes(partition.Id))
                                 .forEach(partition => (function(){
                                     self.log.debug('Partition ' + partition.name + ' State: ' + partition.actualState);
                                     if (partition.actualState != "disarmed" ){
                                         self.log.debug('Partition ' + partition.name + ' is Armed and under Alarm') 
-                                        self.DiscoveredAccessories.partitions[partition.id].OnAlarm = true;
+                                        self.DiscoveredAccessories.Partitions[partition.Id].OnAlarm = true;
                                     } else {
                                         self.log.debug('Partition ' + partition.name + ' is not Armed')
-                                        self.DiscoveredAccessories.partitions[partition.id].OnAlarm = false;
+                                        self.DiscoveredAccessories.Partitions[partition.Id].OnAlarm = false;
                                     }
                             })());
                         }
@@ -929,10 +943,10 @@ RiscoPanelSession.prototype = {
                                     self.log.debug('Group State ' + group.name + ' State: ' + group.actualState);
                                     if (group.actualState != "disarmed" ){
                                         self.log.debug('Group ' + group.name + ' is Armed and under Alarm') 
-                                        self.DiscoveredAccessories.Groups[group.id].OnAlarm =  true;
+                                        self.DiscoveredAccessories.Groups[group.Id].OnAlarm =  true;
                                     } else {
                                         self.log.debug('Group ' + group.name + ' is not Armed')
-                                        self.DiscoveredAccessories.Groups[group.id].OnAlarm =  false;
+                                        self.DiscoveredAccessories.Groups[group.Id].OnAlarm =  false;
                                     }
                             })());
                         }
@@ -951,10 +965,10 @@ RiscoPanelSession.prototype = {
         var self = this;
         self.log.debug('Entering getPartStates function');
         try {
-            if (self.DiscoveredAccessories.partitions.type == 'system'){
+            if (self.DiscoveredAccessories.Partitions.type == 'system'){
                 self.log.debug('System Mode');
-                self.DiscoveredAccessories.partitions[0].previousState = self.DiscoveredAccessories.partitions[0].actualState;
-                self.DiscoveredAccessories.partitions[0].actualState = (function(){
+                self.DiscoveredAccessories.Partitions[0].previousState = self.DiscoveredAccessories.Partitions[0].actualState;
+                self.DiscoveredAccessories.Partitions[0].actualState = (function(){
                     var armedZones = body.overview.partInfo.armedStr.split(' ');
                     var partArmedZones = body.overview.partInfo.partarmedStr.split(' ');
                     if (parseInt(armedZones[0]) > 0) {
@@ -965,40 +979,40 @@ RiscoPanelSession.prototype = {
                         return 'disarmed';
                     }    
                 })();
-                self.log.debug('Previous State: ' + self.DiscoveredAccessories.partitions[0].previousState);
-                self.log.debug('Actual State: ' + self.DiscoveredAccessories.partitions[0].actualState);
+                self.log.debug('Previous State: ' + self.DiscoveredAccessories.Partitions[0].previousState);
+                self.log.debug('Actual State: ' + self.DiscoveredAccessories.Partitions[0].actualState);
                 if (Math.max(body.ExitDelayTimeout) != 0){
-                    self.DiscoveredAccessories.partitions[0].ExitDelay = Math.max(body.ExitDelayTimeout);
-                    self.log.debug('Arming Delay Left: ' + self.DiscoveredAccessories.partitions[0].ExitDelay);
+                    self.DiscoveredAccessories.Partitions[0].ExitDelay = Math.max(body.ExitDelayTimeout);
+                    self.log.debug('Arming Delay Left: ' + self.DiscoveredAccessories.Partitions[0].ExitDelay);
                 }
-                if ((self.DiscoveredAccessories.partitions[0].OnAlarm == true) && (self.DiscoveredAccessories.partitions[0].actualState == "disarmed")){
-                    self.DiscoveredAccessories.partitions[0].OnAlarm = false;
+                if ((self.DiscoveredAccessories.Partitions[0].OnAlarm == true) && (self.DiscoveredAccessories.Partitions[0].actualState == "disarmed")){
+                    self.DiscoveredAccessories.Partitions[0].OnAlarm = false;
                 }
             } else {
                 self.log.debug('Partition Mode');
                 if (Math.max(body.ExitDelayTimeout) != 0){
                     for (var PartId in body.ExitDelayTimeout){
                        if (body.ExitDelayTimeout[PartId] != 0){
-                            self.DiscoveredAccessories.partitions[PartId].ExitDelay = body.ExitDelayTimeout[PartId];
-                            self.log.debug('Arming Delay Left for Part "' + self.DiscoveredAccessories.partitions[PartId].name + '": ' + self.DiscoveredAccessories.partitions[PartId].ExitDelay);
+                            self.DiscoveredAccessories.Partitions[PartId].ExitDelay = body.ExitDelayTimeout[PartId];
+                            self.log.debug('Arming Delay Left for Part "' + self.DiscoveredAccessories.Partitions[PartId].name + '": ' + self.DiscoveredAccessories.Partitions[PartId].ExitDelay);
                         }
                     }
                 }
                 if (body.detectors != null) {
                     for (var PartId in body.detectors.parts) {
                        const Id = body.detectors.parts[PartId].id;
-                       self.DiscoveredAccessories.partitions[Id].previousState = self.DiscoveredAccessories.partitions[Id].actualState;
-                       self.DiscoveredAccessories.partitions[Id].actualState = (body.detectors.parts[PartId].armIcon).match(/ico-(.*)\.png/)[1];
-                        self.log.debug('Partition Id: ' + Id + ' Label: ' + self.DiscoveredAccessories.partitions[Id].name)
-                        self.log.debug('Previous State: ' + self.DiscoveredAccessories.partitions[Id].previousState);
-                        self.log.debug('Actual State: ' + self.DiscoveredAccessories.partitions[Id].actualState);
+                       self.DiscoveredAccessories.Partitions[Id].previousState = self.DiscoveredAccessories.Partitions[Id].actualState;
+                       self.DiscoveredAccessories.Partitions[Id].actualState = (body.detectors.parts[PartId].armIcon).match(/ico-(.*)\.png/)[1];
+                        self.log.debug('Partition Id: ' + Id + ' Label: ' + self.DiscoveredAccessories.Partitions[Id].name)
+                        self.log.debug('Previous State: ' + self.DiscoveredAccessories.Partitions[Id].previousState);
+                        self.log.debug('Actual State: ' + self.DiscoveredAccessories.Partitions[Id].actualState);
                     }
                 }
-                var Partitions = JSON.parse(JSON.stringify(self.DiscoveredAccessories.partitions));
+                var Partitions = JSON.parse(JSON.stringify(self.DiscoveredAccessories.Partitions));
                 Object.values(Partitions).filter(partition => ((partition.OnAlarm == true) && (partition.actualState == "disarmed")))
                     .forEach(partition => (function(){
                         self.log.debug('Partition ' + partition.name + ' Reset OnAlarm State');
-                        self.DiscoveredAccessories.partitions[partition.id].OnAlarm = false;
+                        self.DiscoveredAccessories.Partitions[partition.Id].OnAlarm = false;
                 })());
             }
             self.log.debug('Leaving getPartStates function');
@@ -1015,7 +1029,7 @@ RiscoPanelSession.prototype = {
         self.log.debug('Entering getGroupsStates function');
         try {
             for (var GroupId in body.allGrpState.GlobalState) {
-                const Id = body.allGrpState.GlobalState[GroupId].Id;
+                const Id = body.allGrpState.GlobalState[GroupId].id;
                 self.DiscoveredAccessories.Groups[Id].previousState = self.DiscoveredAccessories.Groups[Id].actualState;
                 self.DiscoveredAccessories.Groups[Id].actualState = (function(){
                         self.log.debug('Group Armed State? ' + body.allGrpState.GlobalState[GroupId].Armed);
@@ -1030,7 +1044,7 @@ RiscoPanelSession.prototype = {
             Object.values(Groups).filter(group => ((group.OnAlarm == true) && (group.actualState == "disarmed")))
                 .forEach(group => (function(){
                     self.log.debug('Groups ' + group.name + ' Reset OnAlarm State');
-                    self.DiscoveredAccessories.Groups[group.id].OnAlarm = false;
+                    self.DiscoveredAccessories.Groups[group.Id].OnAlarm = false;
             })());
             self.log.debug('Leaving getGroupsStates function');
             return Promise.resolve();
