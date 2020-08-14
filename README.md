@@ -40,7 +40,8 @@ Configuration sample:
             "Detectors": "all|none|0,1,2,....",
             "Custom": {
                 "Door": "all|0,1,2,....",
-                "Window": "all|0,1,2,...."
+                "Window": "all|0,1,2,....",
+                "Contact Sensor": "all|0,1,2,...."
             }
         }
     ]
@@ -87,10 +88,15 @@ Fields:
         * "all": will modify all Detector to Windows
         * "0,1,...": will modify a list of Detector to Windows.
         Accepts a comma-separated list of string where each member is the id of a Detector
+    * "Contact Sensor"=> optional: accept the following options
+        * "all": will modify all Detector to Windows
+        * "0,1,...": will modify a list of Detector to Windows.
+        Accepts a comma-separated list of string where each member is the id of a Detector
 
-For the moment (v1.0.8), it is only possible to indicate if the real type of the detector is:
+For the moment (v1.1.0), it is only possible to indicate if the real type of the detector is:
 - Door contact
 - Window contact
+- Contact Sensor
 
 If no accessory is generated, the system mode operation will be set by default.
 
