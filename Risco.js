@@ -1,88 +1,89 @@
 var axios = require('axios');
 var pollingtoevent = require('polling-to-event');
 
-module.exports.RiscoPanelSession = RiscoPanelSession;
-
 function extractError(aBody) {
     var serverInfo_begin = aBody.indexOf("<span class=\"infoServer\">");
     var serverInfo_end = aBody.indexOf("</span>", serverInfo_begin);
     return aBody.substring(serverInfo_begin + 26, serverInfo_end - 7);
 }
 
-function RiscoPanelSession(aConfig, aLog) {
-    // Do not create new object if already exist
-    // Avoid multiple Session to RiscoCloud
-    if (!(this instanceof RiscoPanelSession)) {
-        return new RiscoPanelSession(aConfig, aLog);
+class RiscoPanelSession {
+    constructor(aConfig, aLog) {
+        // Do not create new object if already exist
+        // Avoid multiple Session to RiscoCloud
+        if (!(this instanceof RiscoPanelSession)) {
+            return new RiscoPanelSession(aConfig, aLog);
+        }
+        this.Ready = false;
+        this.DiscoveredAccessories ;
+        this.risco_panel_name = aConfig['name'];
+        this.risco_username = encodeURIComponent(aConfig['riscoUsername']);
+        this.risco_password = encodeURIComponent(aConfig['riscoPassword']);
+        this.risco_pincode = aConfig['riscoPIN'];
+        this.risco_siteId = aConfig['riscoSiteId'];
+        this.polling = aConfig['polling'] || false;
+        this.pollInterval = aConfig['pollInterval'] || 30000;
+        this.Partition = aConfig['Partition'];
+        this.Groups = aConfig['Groups'];
+        this.Outputs = aConfig['Outputs'];
+        this.Detectors = aConfig['Detectors'];
+        this.log = aLog;
+        this.req_counter = 0;
+        this.riscoCookies;
+        this.SessionLogged = false;
+        this.LastEvent = null;
+        this.BadResponseCounter = 0;
+
+        this.long_event_name = ('RPS_long_%s', (this.risco_panel_name.toLowerCase()).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ /g, '_'));
+        this.PollingLoop();
     }
-    this.Ready = false;
-    this.DiscoveredAccessories ;
-    this.risco_panel_name = aConfig['name'];
-    this.risco_username = encodeURIComponent(aConfig['riscoUsername']);
-    this.risco_password = encodeURIComponent(aConfig['riscoPassword']);
-    this.risco_pincode = aConfig['riscoPIN'];
-    this.risco_siteId = aConfig['riscoSiteId'];
-    this.polling = aConfig['polling'] || false;
-    this.pollInterval = aConfig['pollInterval'] || 30000;
-    this.Partition = aConfig['Partition'];
-    this.Groups = aConfig['Groups'];
-    this.Outputs = aConfig['Outputs'];
-    this.Detectors = aConfig['Detectors'];
-    this.log = aLog;
-    this.req_counter = 0;
-    this.riscoCookies;
-    this.SessionLogged = false;
-    this.LastEvent = null;
-    this.BadResponseCounter = 0;
 
-    this.long_event_name = 'RPS_long_' + (this.risco_panel_name.toLowerCase()).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ /g, '_');
+    PollingLoop() {
+        var self = this;
 
-    var self = this;
-
-    // set up polling if requested
-    if (self.polling) {
-        self.log.info('Starting polling with an interval of %s ms', self.pollInterval);
-        emitter = pollingtoevent(function (done) {
-            if ((self.Ready === true) && (self.SessionLogged)) {
-                self.getCPStates(function (err, result) {
-                    done(err, result);
+        // set up polling if requested
+        if (self.polling) {
+            self.log.info('Starting polling with an interval of %s ms', self.pollInterval);
+            var emitter = new pollingtoevent(function (done) {
+                if ((self.Ready === true) && (self.SessionLogged)) {
+                    self.getCPStates(function (err, result) {
+                        done(err, result);
+                    });
+                } else {
+                    done(null, null);
+                }
+            }, {
+                    longpollEventName: self.long_event_name,
+                    longpolling: true,
+                    interval: self.pollInterval
                 });
-            } else {
-                done(null, null);
-            }
-        }, {
-                longpollEventName: self.long_event_name,
-                longpolling: true,
-                interval: self.pollInterval
+
+            emitter.on(self.long_event_name, function (state) {
+                if (state) {
+                    // Get OnceMore time Current State:
+                    self.log.info('New state detected: (%s) -> %s. Notify!', state, translateState(state));
+                    self.securityService.setCharacteristic(Characteristic.SecuritySystemCurrentState, state);
+                    self.riscoCurrentState = state;
+                }
             });
 
-        emitter.on(self.long_event_name, function (state) {
-            if (state) {
-                // Get OnceMore time Current State:
-                self.log.info('New state detected: (' + state + ') -> ' + translateState(state) + '. Notify!');
-                self.securityService.setCharacteristic(Characteristic.SecuritySystemCurrentState, state);
-                self.riscoCurrentState = state;
-            }
-        });
-
-        emitter.on("err", function (err) {
-            self.log.error("Polling failed, error was %s", err);
-        });
+            emitter.on('err', function (err) {
+                self.log.error('Polling failed, error was %s', err);
+            });
+        }
     }
-}
 
-RiscoPanelSession.prototype = {
     IsLogged(){
         return self.SessionLogged;
-    },
+    }
 
     async IsValidResponse(response, functionName, htmltest = true){
         var self = this;
         try {
             if (htmltest == true){
                 if (response.data.error != 0){
-                    self.log.debug('Got Invalid RiscoCloud\'s Response from ' + functionName + '. Retry...');
-                    self.log.debug('Bad response : ' + JSON.stringify(response.data));
+                    self.log.debug('Got Invalid RiscoCloud\'s Response from %s. Retry...', functionName);
+                    self.log.debug('Bad response:\n%s', JSON.stringify(response.data));
                     ++self.BadResponseCounter;
                     if (self.BadResponseCounter >= 5){
                         self.SessionLogged = false;
@@ -93,14 +94,14 @@ RiscoPanelSession.prototype = {
                     return false
                 } else {
                     self.BadResponseCounter = 0;
-                    self.log.debug('Got Valid RiscoCloud\'s Response from ' + functionName + '. Continue...');
-                    self.log.debug('Good Response : ' + JSON.stringify(response.data));
+                    self.log.debug('Got Valid RiscoCloud\'s Response from %s. Continue...', functionName);
+                    self.log.debug('Good Response:\n%s', JSON.stringify(response.data));
                     return true
                 }
             } else {
                 if (response.status == 302){
-                    self.log.debug('Got Invalid RiscoCloud\'s Response from ' + functionName + '. Retry...');
-                    self.log.debug('Bad response : ' + response.status);
+                    self.log.debug('Got Invalid RiscoCloud\'s Response from %s. Retry...', functionName);
+                    self.log.debug('Bad response:\n%s', response.status);
                     ++self.BadResponseCounter;
                     if (self.BadResponseCounter >= 5){
                         self.SessionLogged = false;
@@ -111,16 +112,16 @@ RiscoPanelSession.prototype = {
                     return false
                 } else {
                     self.BadResponseCounter = 0;
-                    self.log.debug('Got Valid RiscoCloud\'s Response from ' + functionName + '. Continue...');
-                    self.log.debug('Good Response : ' + response.status);
+                    self.log.debug('Got Valid RiscoCloud\'s Response from %s. Continue...', functionName);
+                    self.log.debug('Good Response: %s', response.status);
                     return true
                 }
             }
         } catch (err) {
-            self.log.error('Error on IsInvalidResponse : ' + err);
+            self.log.error('Error on IsInvalidResponse : %s', err);
             return false
         }
-    },
+    }
 
     async login() {
         var self = this;
@@ -128,7 +129,7 @@ RiscoPanelSession.prototype = {
         try{
             if (!self.SessionLogged){
 
-                const post_data = 'username=' + self.risco_username + '&password=' + self.risco_password;
+                const post_data = `username=${self.risco_username}&password=${self.risco_password}`;
                 const resp_s1 = await axios({
                     url: 'https://www.riscocloud.com/ELAS/WebUI/',
                     method: 'POST',
@@ -147,9 +148,9 @@ RiscoPanelSession.prototype = {
                 if (resp_s1.status == 302) {
                     self.log.debug('Logged In Stage 1');
                     self.riscoCookies = JSON.stringify(resp_s1.headers['set-cookie']);
-                    self.log.debug('Cookie : ' + self.riscoCookies);
+                    self.log.debug('Cookie :\n%s', self.riscoCookies);
 
-                    const post_data = 'SelectedSiteId=' + self.risco_siteId + '&Pin='+ self.risco_pincode;
+                    const post_data = `SelectedSiteId=${self.risco_siteId}&Pin=${self.risco_pincode}`;
                     const resp_s2 = await axios({
                         url: 'https://www.riscocloud.com/ELAS/WebUI/SiteLogin',
                         method: 'POST',
@@ -178,15 +179,15 @@ RiscoPanelSession.prototype = {
                         self.riscoCookies = '';
                     }
                 } else {
-                    throw new Error('Bad HTTP Response : ' + resp_s1.status);
+                    throw new Error(`Bad HTTP Response: ${resp_s1.status}`);
                 }
             }
         } catch (err) {
-            self.log.error('Error on login : ' + err);
+            self.log.error('Error on login:\n%s', err);
             self.SessionLogged = false;
             self.riscoCookies = '';
         }
-    },
+    }
 
     async logout(callback) {
         var self = this;
@@ -231,10 +232,10 @@ RiscoPanelSession.prototype = {
                         self.log.info('Logout from Cloud');
                         return Promise.resolve();
                     } else {
-                        throw new Error('Bad HTTP Response : ' + resp_s2.status);
+                        throw new Error(`Bad HTTP Response: ${resp_s2.status}`);
                     }
                 } else {
-                    throw new Error('Bad HTTP Response : ' + resp_s1.status);
+                    throw new Error(`Bad HTTP Response: ${resp_s1.status}`);
                 }
 
             } else {
@@ -242,12 +243,12 @@ RiscoPanelSession.prototype = {
                 return Promise.resolve();
             }
         } catch (err) {
-            self.log.error(err);
+            self.log.error('Error on login:\n%s', err);
             self.SessionLogged = false;
             self.riscoCookies = '';
             return Promise.reject(err);
         }
-    },
+    }
 
     async IsUserCodeExpired(){
         var self = this;
@@ -270,24 +271,24 @@ RiscoPanelSession.prototype = {
                     },
                     maxRedirects: 0,
                 });
-            } while (self.IsValidResponse(response, "IsUserCodeExpired") == false)
+            } while (self.IsValidResponse(response, 'IsUserCodeExpired') == false)
 
             if (response.status == 200) {
-                self.log.debug('User Code Expired ? ' + response.data.pinExpired );
+                self.log.debug('User Code Expired ? %s', response.data.pinExpired );
                 return response.data.pinExpired;
             } else {
-                throw new Error('Bad HTTP Response : ' + response.status);
+                throw new Error(`Bad HTTP Response: ${response.status}`);
             }
         } catch (err) {
-            self.log.error('UserCodeExpired error : ' + err );
+            self.log.error('UserCodeExpired error:\n%s', err );
         }
-    },
+    }
 
     async ValidateUserCode() {
         var self = this;
         self.log.debug('User Code Validation');
         try {
-            const post_data = 'code=' + self.risco_pincode;
+            const post_data = `code=${self.risco_pincode}`;
             var response;
             do {
                 response = await axios({
@@ -307,7 +308,7 @@ RiscoPanelSession.prototype = {
                     },
                     maxRedirects: 0,
                 });
-            } while (self.IsValidResponse(response, "ValidateUserCode") == false)
+            } while (self.IsValidResponse(response, 'ValidateUserCode') == false)
 
             if (response.status == 200) {
                 if (response.data.error == 14) {
@@ -317,12 +318,12 @@ RiscoPanelSession.prototype = {
                     return true;
                 }                
             } else {
-                throw new Error('Bad HTTP Response : ' + response.status);
+                throw new Error(`Bad HTTP Response: ${response.status}`);
             }
         } catch (err) {
-            self.log.error('Error on Validate User Code' + err);
+            self.log.error('Error on Validate User Code:\n%s', err);
         }
-    },
+    }
 
     async KeepAlive() {
         var self = this;
@@ -359,7 +360,7 @@ RiscoPanelSession.prototype = {
                             },
                             maxRedirects: 0,
                         });
-                    } while (self.IsValidResponse(response, "KeepAlive") == false)
+                    } while (self.IsValidResponse(response, 'KeepAlive') == false)
 
                     if ( (response.headers['Location'] == '/ELAS/WebUI/UserLogin/SessionExpired') || (response.data.error == 3)) {
                         self.SessionLogged = false;
@@ -367,7 +368,7 @@ RiscoPanelSession.prototype = {
                         await self.login();
                     } else if (response.status != 200) {
                         self.log.debug(response);
-                        throw new Error('KeepAlive Bad HTTP Response : ' + response.status);
+                        throw new Error('KeepAlive Bad HTTP Response: {response.status}');
                     }
                     if ((response.data.overview !== null) || (response.data.detectors !== null)){
                         self.log.debug('Status change since the last scan. Manual update of the values.');
@@ -382,10 +383,10 @@ RiscoPanelSession.prototype = {
 
             }
         } catch (err) {
-            self.log.error('Error on KeepAlive: ' +err);
+            self.log.error('Error on KeepAlive:\n%s', err);
             return null;
         }
-    },
+    }
 
     async DiscoverParts() {
         var self = this;
@@ -422,7 +423,7 @@ RiscoPanelSession.prototype = {
                     },
                     maxRedirects: 0,
                 });
-            } while (self.IsValidResponse(response, "DiscoverParts") == false)
+            } while (self.IsValidResponse(response, 'DiscoverParts') == false)
 
             if (response.status == 200) {
 
@@ -433,7 +434,7 @@ RiscoPanelSession.prototype = {
                     var Part_Data = {
                         Id: 0,
                         name: self.risco_panel_name,
-                        longName: 'part_0_' + (self.risco_panel_name.toLowerCase()).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ /g, '_'),
+                        longName: `part_0_${(self.risco_panel_name.toLowerCase()).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ /g, '_')}`,
                         Required: 'system',
                         accessorytype: 'System',
                         previousState: null,
@@ -461,7 +462,7 @@ RiscoPanelSession.prototype = {
                         var Part_Data = {
                             Id: body.detectors.parts[PartId].id,
                             name: body.detectors.parts[PartId].name,
-                            longName: 'part_' + body.detectors.parts[PartId].id + '_' + (body.detectors.parts[PartId].name.toLowerCase()).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ /g, '_'),
+                            longName: `part_${body.detectors.parts[PartId].id}_${(body.detectors.parts[PartId].name.toLowerCase()).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ /g, '_')}`,
                             Required: null,
                             accessorytype: 'Partitions',
                             ExitDelay: 0,
@@ -473,7 +474,7 @@ RiscoPanelSession.prototype = {
                             disarmCommand: 'disarmed',
                             OnAlarm: false
                         };
-                        self.log.debug('Discovering Partition : ' + body.detectors.parts[PartId].name + ' with Id : ' + body.detectors.parts[PartId].id);
+                        self.log.debug('Discovering Partition : %s with Id: %s', body.detectors.parts[PartId].name, body.detectors.parts[PartId].id);
                         if (self.Partition == 'all') {
                             self.log.debug('All Partitions Required');
                             Part_Data.Required = true;
@@ -484,10 +485,10 @@ RiscoPanelSession.prototype = {
                                 return parseInt(item, 10);
                             });
                             if (Required_Zones.includes(Part_Data.Id) !== false){
-                                self.log.debug('Partitions "' + body.detectors.parts[PartId].name + '" Required');
+                                self.log.debug('Partitions "%s" Required', body.detectors.parts[PartId].name);
                                 Part_Data.Required = true;
                             } else {
-                                self.log.debug('Partitions "' + body.detectors.parts[PartId].name + '" Not Required');
+                                self.log.debug('Partitions "%s" Not Required', body.detectors.parts[PartId].name);
                                 Part_Data.Required = false;
                             }
                         } else {
@@ -498,15 +499,15 @@ RiscoPanelSession.prototype = {
                     }
                     Parts_Datas.type = 'partition';
                 }
-                self.log.info('Discovered '+ ( Object.keys(Parts_Datas).length - 1 ) + ' Partitions');
+                self.log.info('Discovered %s Partitions', (Object.keys(Parts_Datas).length - 1 ));
                 return Parts_Datas;
             } else {
                 throw new Error('Cannot Retrieve Partitions Infos');
             }
         } catch (err) {
-            self.log.error('Error on Discovery Partition : ' + err);
+            self.log.error('Error on Discovery Partition: %s', err);
         }
-    },
+    }
 
     async DiscoverGroups() {
         var self = this;
@@ -529,17 +530,17 @@ RiscoPanelSession.prototype = {
                     },
                     maxRedirects: 0,
                 });
-            } while (self.IsValidResponse(response, "DiscoverGroups", false) == false)
+            } while (self.IsValidResponse(response, 'DiscoverGroups', false) == false)
 
             if (response.status == 200){
-                self.log.debug('Groups Status: ' + response.status);
+                self.log.debug('Groups Status: %s', response.status);
                 var GroupInfo = (function() { 
                     var GroupInfo_begin = response.data.indexOf('<label for="actGrpItem');
-                    self.log.debug('Groups => HTML Output Info start at : ' + GroupInfo_begin);
+                    self.log.debug('Groups => HTML Output Info start at: %s', GroupInfo_begin);
                     var GroupInfo_end = response.data.indexOf('</section>', GroupInfo_begin);
-                    self.log.debug('Groups => HTML Output Info finish at : ' + GroupInfo_end);
+                    self.log.debug('Groups => HTML Output Info finish at: %s', GroupInfo_end);
                     var Groups_list = response.data.substring(GroupInfo_begin , GroupInfo_end - 11).match(/<label for="actGrpItem\d">.*?<\/div>/gs);
-                    self.log.info('Discovered '+ Groups_list.length + ' Groups');
+                    self.log.info('Discovered %s Groups', Groups_list.length);
                     
                     var Groups_Datas = {};
                     var ParentPartList = response.data.match(/<label data-groups=".*">.*<.*OpenPartGroups.*?\)\'/gm);
@@ -547,15 +548,16 @@ RiscoPanelSession.prototype = {
                     for (var Group in Groups_list){
                         const GroupName = Groups_list[Group].match(/<label for="actGrpItem\d">(.*?)<\/label>/s)[1];
                         const GroupId = parseInt(Groups_list[Group].match(/<label for="actGrpItem(\d)">/s)[1], 10);
+                        const Gname = `Group ${GroupName}`;
                         var Group_Data = {
                             Id: GroupId,
-                            name: 'Group ' + GroupName,
-                            longName: 'group_' + GroupId + '_' + (('Group ' + GroupName).toLowerCase()).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ /g, '_'),
+                            name: Gname,
+                            longName: `group_${GroupId}_${(Gname.toLowerCase()).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ /g, '_')}`,
                             parentPart: (function(){
                                 var resultArray = [];
                                 self.log('parentpart');
                                 for (var ParentPart in ParentPartList) {
-                                    var ParentPartId = ParentPartList[ParentPart].match(new RegExp('<label data-groups=".*?' + GroupName+ '.*?">.*<.*OpenPartGroups\\("(\\d*?)"','gm'));
+                                    var ParentPartId = ParentPartList[ParentPart].match(new RegExp('<label data-groups=".*?' + GroupName + '.*?">.*<.*OpenPartGroups\\("(\\d*?)"','gm'));
                                     if (ParentPartId != null ){
                                         resultArray.push((''+ParentPartId).match(/"(\d*?)"$/s)[1]);
                                     }
@@ -578,7 +580,7 @@ RiscoPanelSession.prototype = {
                                 })(),
                             OnAlarm: false
                         };
-                        self.log.debug('Discovering Group : "' + Group_Data.name + '" with Id : ' + Group_Data.Id);
+                        self.log.debug('Discovering Group : "%s" with Id: %s', Group_Data.name, Group_Data.Id);
                         if (self.Groups == 'all') {
                             self.log.debug('All Groups Required');
                             Group_Data.Required = true;
@@ -589,10 +591,10 @@ RiscoPanelSession.prototype = {
                                 return parseInt(item, 10);
                             });
                             if (Required_Groups.includes(Group_Data.Id) !== false){
-                                self.log.debug('Group "' + Group_Data.name + '" Required');
+                                self.log.debug('Group "%s" Required', Group_Data.name);
                                 Group_Data.Required = true;
                             } else {
-                                self.log.debug('Group "' + Group_Data.name + '" Not Required');
+                                self.log.debug('Group "%s" Not Required', Group_Data.name);
                                 Group_Data.Required = false;
                             }
                         }
@@ -604,12 +606,12 @@ RiscoPanelSession.prototype = {
                 })();
                 return GroupInfo;
             } else {
-                throw new Error('Bad HTTP Response : ' + response.status);
+                throw new Error(`Bad HTTP Response: ${response.status}`);
             }
         } catch (err) {
-            self.log.error(err);
+            self.log.error('Error on Discovery Group: %s', err);
         }
-    },
+    }
 
     async DiscoverOutputs() {
         var self = this;
@@ -632,16 +634,16 @@ RiscoPanelSession.prototype = {
                     },
                     maxRedirects: 0,
                 }); 
-            } while (self.IsValidResponse(response, "DiscoverOutputs", false) == false)
+            } while (self.IsValidResponse(response, 'DiscoverOutputs', false) == false)
 
             if (response.status == 200){
                 var OutputInfo = (function() { 
                     var OutputInfo_begin = response.data.indexOf('<ul style="list-style:none; margin:0; padding:0;">');
-                    self.log.debug('HTML Output Info start at : ' + OutputInfo_begin);
+                    self.log.debug('HTML Output Info start at: %s', OutputInfo_begin);
                     var OutputInfo_end = response.data.indexOf('</ul>', OutputInfo_begin);
-                    self.log.debug('HTML Output Info finish at : ' + OutputInfo_end);
+                    self.log.debug('HTML Output Info finish at: %s', OutputInfo_end);
                     var Output_list = response.data.substring(OutputInfo_begin + 50, OutputInfo_end - 5).match(/<li.*?<\/li>/gs);
-                    self.log.info('Discovered '+ Output_list.length + ' Output');
+                    self.log.info('Discovered %s Output', Output_list.length);
                     var Outputs_Datas = {};
                     for (var list in Output_list){
                         self.log.debug(Output_list[list]);
@@ -651,7 +653,7 @@ RiscoPanelSession.prototype = {
                         var Output_Data = {
                             Id: OutputId,
                             name: OutputName,
-                            longName: 'out_' + OutputId + '_' + (OutputName.toLowerCase()).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ /g, '_'),
+                            longName: `out_${OutputId}_${(OutputName.toLowerCase()).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ /g, '_')}`,
                             Required: null,
                             accessorytype: 'Outputs',
                             Type: (function() {
@@ -669,7 +671,7 @@ RiscoPanelSession.prototype = {
                                     }
                                 })()
                         };
-                        self.log.debug('Discovering Outputs : ' + Output_Data.name + ' with Id : ' + Output_Data.Id);
+                        self.log.debug('Discovering Outputs : %s with Id : %s', Output_Data.name, Output_Data.Id);
                         if (self.Outputs == 'all') {
                             self.log.debug('All Outputs Required');
                             Output_Data.Required = true;
@@ -680,21 +682,21 @@ RiscoPanelSession.prototype = {
                                 return parseInt(item, 10);
                             });
                             if (Required_Outputs.includes(Output_Data.Id) !== false){
-                                self.log.debug('Outputs "' + Output_Data.name + '" Required');
+                                self.log.debug('Outputs "%s" Required', Output_Data.name);
                                 Output_Data.Required = true;
                             } else {
-                                self.log.debug('Outputs "' + Output_Data.name + '" Not Required');
+                                self.log.debug('Outputs "%s" Not Required', Output_Data.name);
                                 Output_Data.Required = false;
                             }
                         } else {
                             self.log.debug('No Outputs Required');
                             Output_Data.Required = false;
                         }
-                        self.log.debug('name : ' + Output_Data.name);
-                        self.log.debug('Id : ' + Output_Data.Id);
-                        self.log.debug('Command : ' + Output_Data.Command);
-                        self.log.debug('Type : ' + Output_Data.Type);
-                        self.log.debug('State  : ' + Output_Data.State);
+                        self.log.debug('name : %s', Output_Data.name);
+                        self.log.debug('Id: %s', Output_Data.Id);
+                        self.log.debug('Command: %s', Output_Data.Command);
+                        self.log.debug('Type: %s', Output_Data.Type);
+                        self.log.debug('State: %s', Output_Data.State);
                         Outputs_Datas[Output_Data.Id] = Output_Data;
                     }
                     self.log.debug(JSON.stringify(Outputs_Datas));
@@ -702,12 +704,12 @@ RiscoPanelSession.prototype = {
                 })();
                 return OutputInfo;
             } else {
-                throw new Error('Bad HTTP Response : ' + response.status);
+                throw new Error(`Bad HTTP Response: ${response.status}`);
             }
         } catch (err) {
-            self.log.error(err);
+            self.log.error('Error on Discovery Output:\n%s', err);
         }
-    },
+    }
 
     async DiscoverDetectors() {
         var self = this;
@@ -731,10 +733,10 @@ RiscoPanelSession.prototype = {
                     },
                     maxRedirects: 0,
                 }); 
-            } while (self.IsValidResponse(response, "DiscoverDetectors") == false)
+            } while (self.IsValidResponse(response, 'DiscoverDetectors') == false)
 
             if (response.status == 200){
-                self.log.debug('Detectors/Get status: ' + response.status);
+                self.log.debug('Detectors/Get status:\n%s', response.status);
                 var DetectorsInfos = (function() {
                     self.log.debug(JSON.stringify(response.data));
                     var Detectors_Datas = {};
@@ -757,12 +759,11 @@ RiscoPanelSession.prototype = {
                                                 return false;
                                             }
                                 })(),
-                                //type: response.data.detectors.parts[Parts].detectors[Detector].data_icon,
                                 Partition: Parts,
                                 Required: null,
                                 accessorytype: "Detector",
                                 name: DetectorName,
-                                longName: 'det_' + DetectorId + '_' + (DetectorName.toLowerCase()).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ /g, '_'),
+                                longName: `det_${DetectorId}_${(DetectorName.toLowerCase()).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ /g, '_')}`,
                                 State: (function() {
                                             //'detector' for inactive
                                             //'detector2' for active
@@ -780,7 +781,7 @@ RiscoPanelSession.prototype = {
                                 })(),
                                 OnAlarm: false
                             };
-                            self.log.debug('Detector ' + Detector_Data.name + ' icon ' + response.data.detectors.parts[Parts].detectors[Detector].data_icon);
+                            self.log.debug('Detector %s icon %s', Detector_Data.name, response.data.detectors.parts[Parts].detectors[Detector].data_icon);
                             if (self.Detectors == 'all') {
                                 self.log.debug('All Detectors Required');
                                 Detector_Data.Required = true;
@@ -791,10 +792,10 @@ RiscoPanelSession.prototype = {
                                     return parseInt(item, 10);
                                 });
                                 if (Required_Detectors.includes(Detector_Data.Id) !== false){
-                                    self.log.debug('Detectors "' + Detector_Data.name + '" Required');
+                                    self.log.debug('Detectors "%s" Required', Detector_Data.name);
                                     Detector_Data.Required = true;
                                 } else {
-                                    self.log.debug('Detectors "' + Detector_Data.name + '" Not Required');
+                                    self.log.debug('Detectors "%s" Not Required', Detector_Data.name);
                                     Detector_Data.Required = false;
                                 }
                             } else {
@@ -806,15 +807,15 @@ RiscoPanelSession.prototype = {
                     }
                     return Detectors_Datas;
                 })();
-                self.log.info('Discovered '+ Object.keys(DetectorsInfos).length + ' Detector(s)');
+                self.log.info('Discovered %s Detector(s)', Object.keys(DetectorsInfos).length);
                 return DetectorsInfos;
             } else {
-                throw new Error('Bad HTTP Response : ' + response.status);
+                throw new Error(`Bad HTTP Response: ${response.status}`);
             }
         } catch (err) {
-            self.log.error(err);
+            self.log.error('Error on Discovery Detector:\n%s', err);
         }
-    },
+    }
 
     async DiscoverCameras() {
         var self = this;
@@ -838,10 +839,10 @@ RiscoPanelSession.prototype = {
                     },
                     maxRedirects: 0,
                 });            
-            } while (self.IsValidResponse(response, "DiscoverCameras") == false)
+            } while (self.IsValidResponse(response, 'DiscoverCameras') == false)
 
             if (response.status == 200){
-                self.log.debug('Cameras/Get status: ' + response.status);
+                self.log.debug('Cameras/Get status:\n%s',response.status);
                 var CamerasInfos = (function() {
                     self.log.debug(JSON.stringify(response.data));
                     var Cameras_Datas = {};
@@ -857,15 +858,15 @@ RiscoPanelSession.prototype = {
                         }
                     return Cameras_Datas;
                 })();
-                self.log.info('Discovered '+ Object.keys(CamerasInfos).length + ' Camera(s)');
+                self.log.info('Discovered %s Camera(s)', Object.keys(CamerasInfos).length);
                 return CamerasInfos;
             } else {
-                throw new Error('Bad HTTP Response : ' + response.status);
+                throw new Error(`Bad HTTP Response: ${response.status}`);
             }
         } catch (err) {
-            self.log.error(err);
+            self.log.error('Error on Discovery Camera:\n%s', err);
         }
-    },
+    }
 
     async getAlarmState(body) {
         var self = this;
@@ -883,8 +884,8 @@ RiscoPanelSession.prototype = {
                             return b.YTime.localeCompare(a.YTime);
                         });
                         for (var LogRecord in LogRecords){
-                            self.log.debug('Record Id:' + JSON.stringify(LogRecord));
-                            self.log.debug('Record value:' + JSON.stringify(LogRecords[LogRecord]));
+                            self.log.debug('Record Id: %s', JSON.stringify(LogRecord));
+                            self.log.debug('Record value: %s', JSON.stringify(LogRecords[LogRecord]));
                             if (LogRecords[LogRecord].Priority == 'alarm') {
                                 self.log.debug('Event is an Alarm');
                                 ZIdAlarm.push(LogRecords[LogRecord].ZoneId);
@@ -905,8 +906,8 @@ RiscoPanelSession.prototype = {
                         var Detectors = JSON.parse(JSON.stringify(self.DiscoveredAccessories.Detectors));
                         Object.values(Detectors).filter(detector => (detector.State == true))
                             .forEach(detector => (function(){
-                                self.log.debug('Detector ' + detector.name + '(' + detector.Id + ') is active');
-                                self.log.debug('Detector is in partition ' + detector.Partition);
+                                self.log.debug('Detector %s(%s) is active', detector.name, detector.Id);
+                                self.log.debug('Detector is in partition %s', detector.Partition);
                                 PIdAlarm.push(parseInt(detector.Partition));
                                 ZIdAlarm.push(detector.Id);
                         })());
@@ -917,8 +918,8 @@ RiscoPanelSession.prototype = {
                             var Detectors = JSON.parse(JSON.stringify(self.DiscoveredAccessories.Detectors));
                             Object.values(Detectors).filter(detector => ZIdAlarm.includes(detector.Id))
                                 .forEach(detector => (function(){
-                                    self.log.debug('Detector ' + detector.name + '(' + detector.Id + ') is active');
-                                    self.log.debug('Detector is in partition ' + detector.Partition);
+                                    self.log.debug('Detector %s (%s) is active', detector.name, detector.Id);
+                                    self.log.debug('Detector is in partition %s', detector.Partition);
                                     PIdAlarm.push(parseInt(detector.Partition));
                             })());
                         }
@@ -926,12 +927,12 @@ RiscoPanelSession.prototype = {
                             var Partitions = JSON.parse(JSON.stringify(self.DiscoveredAccessories.Partitions));
                             Object.values(Partitions).filter(partition => PIdAlarm.includes(partition.Id))
                                 .forEach(partition => (function(){
-                                    self.log.debug('Partition ' + partition.name + ' State: ' + partition.actualState);
-                                    if (partition.actualState != "disarmed" ){
-                                        self.log.debug('Partition ' + partition.name + ' is Armed and under Alarm') 
+                                    self.log.debug('Partition %s State: %s', partition.name, partition.actualState);
+                                    if (partition.actualState != 'disarmed' ){
+                                        self.log.debug('Partition %s is Armed and under Alarm', partition.name) 
                                         self.DiscoveredAccessories.Partitions[partition.Id].OnAlarm = true;
                                     } else {
-                                        self.log.debug('Partition ' + partition.name + ' is not Armed')
+                                        self.log.debug('Partition %s is not Armed', partition.name)
                                         self.DiscoveredAccessories.Partitions[partition.Id].OnAlarm = false;
                                     }
                             })());
@@ -940,12 +941,12 @@ RiscoPanelSession.prototype = {
                             var Groups = JSON.parse(JSON.stringify(self.DiscoveredAccessories.Groups));
                             Object.values(Groups).filter(group => group.parentPart.filter(GroupID => PIdAlarm.includes(parseInt(GroupID))))
                                 .forEach(group => (function(){
-                                    self.log.debug('Group State ' + group.name + ' State: ' + group.actualState);
-                                    if (group.actualState != "disarmed" ){
-                                        self.log.debug('Group ' + group.name + ' is Armed and under Alarm') 
+                                    self.log.debug('Group State %s State: %s', group.name, group.actualState);
+                                    if (group.actualState != 'disarmed' ){
+                                        self.log.debug('Group %s is Armed and under Alarm', group.name) 
                                         self.DiscoveredAccessories.Groups[group.Id].OnAlarm =  true;
                                     } else {
-                                        self.log.debug('Group ' + group.name + ' is not Armed')
+                                        self.log.debug('Group %s is not Armed', group.name)
                                         self.DiscoveredAccessories.Groups[group.Id].OnAlarm =  false;
                                     }
                             })());
@@ -956,10 +957,10 @@ RiscoPanelSession.prototype = {
             self.log.debug('Leaving VerifyAlarmState function');
             return Promise.resolve();
         } catch (err) {
-            self.log.error('Error on VerifyAlarmState : ' + err);
+            self.log.error('Error on VerifyAlarmState:\n%s', err);
             return Promise.reject();
         }
-    },
+    }
 
     async getPartsStates(body) {
         var self = this;
@@ -979,13 +980,13 @@ RiscoPanelSession.prototype = {
                         return 'disarmed';
                     }    
                 })();
-                self.log.debug('Previous State: ' + self.DiscoveredAccessories.Partitions[0].previousState);
-                self.log.debug('Actual State: ' + self.DiscoveredAccessories.Partitions[0].actualState);
+                self.log.debug('Previous State: %s', self.DiscoveredAccessories.Partitions[0].previousState);
+                self.log.debug('Actual State: %s', self.DiscoveredAccessories.Partitions[0].actualState);
                 if (Math.max(body.ExitDelayTimeout) != 0){
                     self.DiscoveredAccessories.Partitions[0].ExitDelay = Math.max(body.ExitDelayTimeout);
-                    self.log.debug('Arming Delay Left: ' + self.DiscoveredAccessories.Partitions[0].ExitDelay);
+                    self.log.debug('Arming Delay Left: %s', self.DiscoveredAccessories.Partitions[0].ExitDelay);
                 }
-                if ((self.DiscoveredAccessories.Partitions[0].OnAlarm == true) && (self.DiscoveredAccessories.Partitions[0].actualState == "disarmed")){
+                if ((self.DiscoveredAccessories.Partitions[0].OnAlarm == true) && (self.DiscoveredAccessories.Partitions[0].actualState == 'disarmed')){
                     self.DiscoveredAccessories.Partitions[0].OnAlarm = false;
                 }
             } else {
@@ -994,7 +995,7 @@ RiscoPanelSession.prototype = {
                     for (var PartId in body.ExitDelayTimeout){
                        if (body.ExitDelayTimeout[PartId] != 0){
                             self.DiscoveredAccessories.Partitions[PartId].ExitDelay = body.ExitDelayTimeout[PartId];
-                            self.log.debug('Arming Delay Left for Part "' + self.DiscoveredAccessories.Partitions[PartId].name + '": ' + self.DiscoveredAccessories.Partitions[PartId].ExitDelay);
+                            self.log.debug('Arming Delay Left for Part "%s": %s', self.DiscoveredAccessories.Partitions[PartId].name, self.DiscoveredAccessories.Partitions[PartId].ExitDelay);
                         }
                     }
                 }
@@ -1003,15 +1004,15 @@ RiscoPanelSession.prototype = {
                        const Id = body.detectors.parts[PartId].id;
                        self.DiscoveredAccessories.Partitions[Id].previousState = self.DiscoveredAccessories.Partitions[Id].actualState;
                        self.DiscoveredAccessories.Partitions[Id].actualState = (body.detectors.parts[PartId].armIcon).match(/ico-(.*)\.png/)[1];
-                        self.log.debug('Partition Id: ' + Id + ' Label: ' + self.DiscoveredAccessories.Partitions[Id].name)
-                        self.log.debug('Previous State: ' + self.DiscoveredAccessories.Partitions[Id].previousState);
-                        self.log.debug('Actual State: ' + self.DiscoveredAccessories.Partitions[Id].actualState);
+                        self.log.debug('Partition Id: %s Label: %s',Id, self.DiscoveredAccessories.Partitions[Id].name)
+                        self.log.debug('Previous State: %s', self.DiscoveredAccessories.Partitions[Id].previousState);
+                        self.log.debug('Actual State: %s', self.DiscoveredAccessories.Partitions[Id].actualState);
                     }
                 }
                 var Partitions = JSON.parse(JSON.stringify(self.DiscoveredAccessories.Partitions));
                 Object.values(Partitions).filter(partition => ((partition.OnAlarm == true) && (partition.actualState == "disarmed")))
                     .forEach(partition => (function(){
-                        self.log.debug('Partition ' + partition.name + ' Reset OnAlarm State');
+                        self.log.debug('Partition %s Reset OnAlarm State', partition.name);
                         self.DiscoveredAccessories.Partitions[partition.Id].OnAlarm = false;
                 })());
             }
@@ -1019,10 +1020,10 @@ RiscoPanelSession.prototype = {
             return Promise.resolve();
         } catch (err) {
             self.log.debug('Leaving getPartStates function');
-            self.log.error('Error on Get Partitions States : ' + err);
+            self.log.error('Error on Get Partitions States: %s', err);
             return Promise.reject();
         }
-    },
+    }
 
     async getGroupsStates(body) {
         var self = this;
@@ -1036,23 +1037,23 @@ RiscoPanelSession.prototype = {
                         self.log.debug(body.allGrpState.GlobalState);
                         return ((body.allGrpState.GlobalState[GroupId].Armed != false)?'armed':'disarmed');
                     })();
-                self.log.debug('Group Id: ' + Id + ' Label: ' + self.DiscoveredAccessories.Groups[Id].name)
-                self.log.debug('Previous State: ' + self.DiscoveredAccessories.Groups[Id].previousState);
-                self.log.debug('Actual State: ' + self.DiscoveredAccessories.Groups[Id].actualState);
+                self.log.debug('Group Id: %s Label: %s', Id, self.DiscoveredAccessories.Groups[Id].name)
+                self.log.debug('Previous State: %s', self.DiscoveredAccessories.Groups[Id].previousState);
+                self.log.debug('Actual State: %s', self.DiscoveredAccessories.Groups[Id].actualState);
             }
             var Groups = JSON.parse(JSON.stringify(self.DiscoveredAccessories.Groups));
-            Object.values(Groups).filter(group => ((group.OnAlarm == true) && (group.actualState == "disarmed")))
+            Object.values(Groups).filter(group => ((group.OnAlarm == true) && (group.actualState == 'disarmed')))
                 .forEach(group => (function(){
-                    self.log.debug('Groups ' + group.name + ' Reset OnAlarm State');
+                    self.log.debug('Groups %s Reset OnAlarm State', group.name);
                     self.DiscoveredAccessories.Groups[group.Id].OnAlarm = false;
             })());
             self.log.debug('Leaving getGroupsStates function');
             return Promise.resolve();
         } catch (err) {
-            self.log.error('Error on getGroupsStates : ' + err);
+            self.log.error('Error on getGroupsStates: %s', err);
             return Promise.reject();
         }
-    },
+    }
 
     async getOutputsStates(body) {
         var self = this;
@@ -1061,15 +1062,15 @@ RiscoPanelSession.prototype = {
             for (var OutputId in body.haSwitch) {
                     const Id = body.haSwitch[OutputId].ID;
                     self.DiscoveredAccessories.Outputs[Id].State = body.haSwitch[OutputId].State;
-                    self.log.debug('Output Id: ' + Id + ' Label: ' + self.DiscoveredAccessories.Outputs[Id].name)
+                    self.log.debug('Output Id: %s Label: %s', Id, self.DiscoveredAccessories.Outputs[Id].name)
             }
             self.log.debug('Leaving getOutputsStates function');
             return Promise.resolve();
         } catch (err) {
-            self.log.error('Error on getOutputsStates : ' + err);
+            self.log.error('Error on getOutputsStates: %s', err);
             return Promise.reject();
         }
-    },
+    }
 
     async getDetectorsStates(body) {
         var self = this;
@@ -1092,16 +1093,16 @@ RiscoPanelSession.prototype = {
                             return false;
                         }
                     })();
-                    self.log.debug('Detector Id: ' + Id + ' Label: ' + self.DiscoveredAccessories.Detectors[Id].name)
+                    self.log.debug('Detector Id: %s Label: %s', Id, self.DiscoveredAccessories.Detectors[Id].name)
                 }
             }
             self.log.debug('Leaving getDetectorsStates function');
             return Promise.resolve();
         } catch (err) {
-            self.log.error('Error on getDetectorsStates : ' + err);
+            self.log.error('Error on getDetectorsStates: %s', err);
             return Promise.reject();
         }
-    },
+    }
 
     async getCPStates() {
         var self = this;
@@ -1130,14 +1131,14 @@ RiscoPanelSession.prototype = {
                             },
                             maxRedirects: 0,
                         });
-                    } while (self.IsValidResponse(response, "getCPStates") == false)
+                    } while (self.IsValidResponse(response, 'getCPStates') == false)
 
                     if (response.status == 200) {
                         body = response.data;
                         if (response.data.eh != null) {
                             self.log.debug('Last Events Updated');
                             self.LastEvent = response.data.eh[0];
-                            self.log.debug('Last Events New Value: ' + JSON.stringify(self.LastEvent));
+                            self.log.debug('Last Events New Value:\n%s', JSON.stringify(self.LastEvent));
                         }
                         if (response.data.OngoingAlarm == true) {
                             self.log.debug('CPanel is under Alarm');
@@ -1157,10 +1158,11 @@ RiscoPanelSession.prototype = {
             }
             return Promise.resolve(true);
         } catch (err) {
+            self.log.error('Error on getCPStates: %s', err);
             self.log.debug('Leaving getCPStates function');
             return Promise.reject(err);
         }
-    },
+    }
 
     async UpdateCPStates(body) {
         var self = this;
@@ -1186,10 +1188,11 @@ RiscoPanelSession.prototype = {
             self.log.debug('Leaving UpdateCPStates function');
             return Promise.resolve(true);
         } catch (err) {
+            self.log.error('Error on UpdateCPStates: %s', err);
             self.log.debug('Leaving UpdateCPStates function');
             return Promise.reject(err);
         }
-    },
+    }
 
     async armDisarm(aState, cmd) {
         //TODO : Add capability to restore exclude State
@@ -1202,12 +1205,12 @@ RiscoPanelSession.prototype = {
             var targetPasscode;
             if (aState) {
                 // ARM
-                self.log.debug('Arming command: ' + targetType);
-                targetPasscode = "";
+                self.log.debug('Arming command: %s', targetType);
+                targetPasscode = '';
             } else {
                 // DISARM or Refresh
-                self.log.debug('Disarming or Refreshing command: ' + targetType);
-                targetPasscode = "------"
+                self.log.debug('Disarming or Refreshing command: %s', targetType);
+                targetPasscode = '------';
             }
 
             var response;
@@ -1221,7 +1224,7 @@ RiscoPanelSession.prototype = {
                         Cookie: self.riscoCookies,
                         'Content-type': 'application/x-www-form-urlencoded'
                     },
-                    data: 'type=' + targetType + '&passcode=' + targetPasscode + '&bypassZoneId=-1',
+                    data: `type=${targetType}&passcode=${targetPasscode}&bypassZoneId=-1`,
 
                     validateStatus(status) {
                         return status >= 200 && status < 400;
@@ -1233,7 +1236,7 @@ RiscoPanelSession.prototype = {
             if (response.status == 200){
                 if (response.data.armFailures !== null ){
                     self.log.debug('armDisarm Not Ok. Using this result for status update');
-                    self.log.debug('errType: ' + response.data.armFailures.errType +' Reason: ' + response.data.armFailures.text);
+                    self.log.debug('errType: %s Reason: %s', response.data.armFailures.errType, response.data.armFailures.text);
                     //Todo :
                     // return more info
                     self.UpdateCPStates(response.data);
@@ -1250,13 +1253,13 @@ RiscoPanelSession.prototype = {
                 }
 
             } else {
-                throw new Error('Bad HTTP Response: ' + response.status);
+                throw new Error(`Bad HTTP Response: ${response.status}`);
             }
         }catch(err){
-            self.log('Error on armDisarm function: ' + err);
+            self.log('Error on armDisarm function:\n%s', err);
             return [0, NaN];
         }
-    },
+    }
 
     async HACommand(type, devId) {
         var self = this;
@@ -1278,20 +1281,20 @@ RiscoPanelSession.prototype = {
                         Cookie: self.riscoCookies,
                         'Content-type': 'application/x-www-form-urlencoded'
                     },
-                    data: 'type=' + targetType + '&devId=' + devId,
+                    data: `type=${targetType}&devId=${devId}`,
 
                     validateStatus(status) {
                         return status >= 200 && status < 400;
                     },
                     maxRedirects: 0,
                 });
-            } while (self.IsValidResponse(response, "HACommand") == false)
+            } while (self.IsValidResponse(response, 'HACommand') == false)
 
             if (response.status == 200){
                 //response for pulse switch ok : {error: 0, haSwitch: [], devId: 2}
                 if (response.data.error != 0){
                     self.log.debug('HACommand Not Ok. Using this result for status update');
-                    self.log.debug('errType: ' + JSON.stringify(response.data));
+                    self.log.debug('errType:\n%s', JSON.stringify(response.data));
                     self.UpdateCPStates(response.data);
                     return false;
                 } else {
@@ -1300,13 +1303,13 @@ RiscoPanelSession.prototype = {
                     return true;
                 }
             } else {
-                throw new Error('Bad HTTP Response: ' + response.status);
+                throw new Error(`Bad HTTP Response: ${response.status}`);
             }
         }catch(err){
-            self.log('Error on HACommand function: ' + err);
+            self.log('Error on HACommand function:\n%s', err);
             return false;
         }
-    },
+    }
 
     async SetBypass(state, devId) {
         var self = this;
@@ -1325,19 +1328,19 @@ RiscoPanelSession.prototype = {
                         Cookie: self.riscoCookies,
                         'Content-type': 'application/x-www-form-urlencoded'
                     },
-                    data: 'id=' + devId + '&bypass=' + state,
+                    data: `id=${devId}&bypass=${state}`,
 
                     validateStatus(status) {
                         return status >= 200 && status < 400;
                     },
                     maxRedirects: 0,
                 });
-            } while (self.IsValidResponse(response, "HACommand") == false)
+            } while (self.IsValidResponse(response, 'HACommand') == false)
 
             if (response.status == 200){
                 if (response.data.error != 0){
                     self.log.debug('SetBypass Not Ok. Using this result for status update');
-                    self.log.debug('errType: ' + JSON.stringify(response.data));
+                    self.log.debug('errType:\n%s', JSON.stringify(response.data));
                     self.UpdateCPStates(response.data);
                     return false;
                 } else {
@@ -1346,11 +1349,13 @@ RiscoPanelSession.prototype = {
                     return true;
                 }
             } else {
-                throw new Error('Bad HTTP Response: ' + response.status);
+                throw new Error(`Bad HTTP Response: ${response.status}`);
             }
         }catch(err){
-            self.log('Error on SetBypass function: ' + err);
+            self.log('Error on SetBypass function:\n%s', err);
             return false;
         }
     }
 }
+
+module.exports.RiscoPanelSession = RiscoPanelSession;
