@@ -173,7 +173,7 @@ class RiscoPanelPlatform {
                 if(add) {
                     accessory.addService(Service.SecuritySystem, accessory.context.name);
                 }else{
-                    this.log.info('Configuring accessory %s_%s', accessory.context.longName, type);
+                    this.log.info('Configuring accessory %s_%s', accessory.displayName, type);
                 }
                 new riscoAccessory.RiscoCPGroups(this.log, object, this.api, accessory);
                 break;
@@ -181,7 +181,7 @@ class RiscoPanelPlatform {
                 if(add) {
                     accessory.addService(Service.Switch, accessory.context.name);
                 }else{
-                    this.log.info('Configuring accessory %s_%s', accessory.context.longName, type);
+                    this.log.info('Configuring accessory %s_%s', accessory.displayName, type);
                 }
                 new riscoAccessory.RiscoCPOutputs(this.log, object, this.api, accessory);
                 break;
