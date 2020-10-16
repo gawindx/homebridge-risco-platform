@@ -17,12 +17,44 @@ class RiscoPanelSession {
         this.Ready = false;
         this.DiscoveredAccessories ;
         this.risco_panel_name = aConfig['name'];
-        this.risco_username = encodeURIComponent(aConfig['riscoUsername']);
-        this.risco_password = encodeURIComponent(aConfig['riscoPassword']);
-        this.risco_pincode = aConfig['riscoPIN'];
-        this.risco_siteId = aConfig['riscoSiteId'];
         this.polling = aConfig['polling'] || false;
         this.pollInterval = aConfig['pollInterval'] || 30000;
+        this.risco_username = encodeURIComponent(aConfig['riscoUsername']);
+        this.risco_password = encodeURIComponent(aConfig['riscoPassword']);
+        this.risco_siteId = aConfig['riscoSiteId'];
+        this.risco_pincode = aConfig['riscoPIN'];
+        this.Custom_armCommand = (function(){
+                                    const regtest = RegExp('\\d:.*');
+                                    if (regtest.test(aConfig['armCommand'])) {
+                                        return 'armed';
+                                    } else {
+                                        return aConfig['armCommand'];
+                                    }
+                                })() || 'armed';
+        this.Custom_nightCommand = (function(){
+                                    const regtest = RegExp('\\d:.*');
+                                    if (regtest.test(aConfig['nightCommand'])) {
+                                        return 'partially';
+                                    } else {
+                                        return aConfig['nightCommand'];
+                                    }
+                                })() || 'partially';
+        this.Custom_homeCommand = (function(){
+                                    const regtest = RegExp('\\d:.*');
+                                    if (regtest.test(aConfig['homeCommand'])) {
+                                        return 'partially';
+                                    } else {
+                                        return aConfig['homeCommand'];
+                                    }
+                                })() || 'partially';
+        this.Custom_disarmCommand = (function(){
+                                    const regtest = RegExp('\\d:.*');
+                                    if (regtest.test(aConfig['disarmCommand'])) {
+                                        return 'partially';
+                                    } else {
+                                        return aConfig['disarmCommand'];
+                                    }
+                                })() || 'disarmed';
         this.Partition = aConfig['Partition'];
         this.Groups = aConfig['Groups'];
         this.Outputs = aConfig['Outputs'];
@@ -40,10 +72,10 @@ class RiscoPanelSession {
 
     PollingLoop() {
         var self = this;
-
         // set up polling if requested
         if (self.polling) {
             self.log.info('Starting polling with an interval of %s ms', self.pollInterval);
+            self.log.info('armcommand after : %s' , self.Custom_armCommand);
             var emitter = new pollingtoevent(function (done) {
                 if ((self.Ready === true) && (self.SessionLogged)) {
                     self.getCPStates(function (err, result) {
@@ -70,6 +102,10 @@ class RiscoPanelSession {
             emitter.on('err', function (err) {
                 self.log.error('Polling failed, error was %s', err);
             });
+
+            emitter.on('close', function () {
+                emitter.removeAllListeners();
+            });
         }
     }
 
@@ -91,12 +127,12 @@ class RiscoPanelSession {
                         self.BadResponseCounter = 0;
                         throw new Error('Too many wrong consecutive answers. Possible connection problem. Consider the session to be disconnected.');   
                     }
-                    return false
+                    return false;
                 } else {
                     self.BadResponseCounter = 0;
                     self.log.debug('Got Valid RiscoCloud\'s Response from %s. Continue...', functionName);
                     self.log.debug('Good Response:\n%s', JSON.stringify(response.data));
-                    return true
+                    return true;
                 }
             } else {
                 if (response.status == 302){
@@ -109,17 +145,17 @@ class RiscoPanelSession {
                         self.BadResponseCounter = 0;
                         throw new Error('Too many wrong consecutive answers. Possible connection problem. Consider the session to be disconnected.');   
                     }
-                    return false
+                    return false;
                 } else {
                     self.BadResponseCounter = 0;
                     self.log.debug('Got Valid RiscoCloud\'s Response from %s. Continue...', functionName);
                     self.log.debug('Good Response: %s', response.status);
-                    return true
+                    return true;
                 }
             }
         } catch (err) {
             self.log.error('Error on IsInvalidResponse : %s', err);
-            return false
+            return false;
         }
     }
 
@@ -143,6 +179,13 @@ class RiscoPanelSession {
                         return status >= 302 && status < 400;
                     },
                     maxRedirects: 0,
+                })
+                .catch(function (error) {
+                    if (error.response){
+                        throw new Error(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
+                    } else {
+                        throw new Error(`Error on Request : ${error.errno}\n Code : ${error.code}`);
+                    }
                 });
                 
                 if (resp_s1.status == 302) {
@@ -168,6 +211,13 @@ class RiscoPanelSession {
                             return status >= 302 && status < 400;
                         },
                         maxRedirects: 0,                        
+                    })
+                    .catch(function (error) {
+                        if (error.response){
+                            throw new Error(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
+                        } else {
+                            throw new Error(`Error on Request : ${error.errno}\n Code : ${error.code}`);
+                        }
                     });
 
                     if (resp_s2.status == 302) {
@@ -178,14 +228,18 @@ class RiscoPanelSession {
                     } else {
                         self.riscoCookies = '';
                     }
+                    return Promise.resolve();
                 } else {
                     throw new Error(`Bad HTTP Response: ${resp_s1.status}`);
                 }
+            } else {
+                return Promise.resolve();
             }
         } catch (err) {
             self.log.error('Error on login:\n%s', err);
             self.SessionLogged = false;
             self.riscoCookies = '';
+            return Promise.reject(err);
         }
     }
 
@@ -208,6 +262,13 @@ class RiscoPanelSession {
                         return status >= 302 && status < 400;
                     },
                     maxRedirects: 0,
+                })
+                .catch(function (error) {
+                    if (error.response){
+                        throw new Error(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
+                    } else {
+                        throw new Error(`Error on Request : ${error.errno}\n Code : ${error.code}`);
+                    }
                 });
 
                 if (resp_s1.status == 302){
@@ -225,7 +286,15 @@ class RiscoPanelSession {
                             return status >= 302 && status < 400;
                         },
                         maxRedirects: 0,
+                    })
+                    .catch(function (error) {
+                        if (error.response){
+                            throw new Error(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
+                        } else {
+                            throw new Error(`Error on Request : ${error.errno}\n Code : ${error.code}`);
+                        }
                     });
+
                     if (resp_s2.status == 302){
                         self.SessionLogged = false;
                         self.riscoCookies = '';
@@ -237,7 +306,6 @@ class RiscoPanelSession {
                 } else {
                     throw new Error(`Bad HTTP Response: ${resp_s1.status}`);
                 }
-
             } else {
                 self.riscoCookies = '';
                 return Promise.resolve();
@@ -270,6 +338,13 @@ class RiscoPanelSession {
                         return status >= 200 && status < 400;
                     },
                     maxRedirects: 0,
+                })
+                .catch(function (error) {
+                    if (error.response){
+                        throw new Error(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
+                    } else {
+                        throw new Error(`Error on Request : ${error.errno}\n Code : ${error.code}`);
+                    }
                 });
             } while (self.IsValidResponse(response, 'IsUserCodeExpired') == false)
 
@@ -281,6 +356,7 @@ class RiscoPanelSession {
             }
         } catch (err) {
             self.log.error('UserCodeExpired error:\n%s', err );
+            return true;
         }
     }
 
@@ -307,6 +383,13 @@ class RiscoPanelSession {
                         return status >= 200 && status < 400;
                     },
                     maxRedirects: 0,
+                })
+                .catch(function (error) {
+                    if (error.response){
+                        throw new Error(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
+                    } else {
+                        throw new Error(`Error on Request : ${error.errno}\n Code : ${error.code}`);
+                    }
                 });
             } while (self.IsValidResponse(response, 'ValidateUserCode') == false)
 
@@ -315,13 +398,14 @@ class RiscoPanelSession {
                     throw new Error('PinCode Error');
                 } else if (response.data.error == 0) {
                     self.log.debug('User Code Validation : Ok');
-                    return true;
+                    return;
                 }                
             } else {
                 throw new Error(`Bad HTTP Response: ${response.status}`);
             }
         } catch (err) {
             self.log.error('Error on Validate User Code:\n%s', err);
+            return;
         }
     }
 
@@ -359,6 +443,13 @@ class RiscoPanelSession {
                                 return status >= 200 && status < 400;
                             },
                             maxRedirects: 0,
+                        })
+                        .catch(function (error) {
+                            if (error.response){
+                                throw new Error(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
+                            } else {
+                                throw new Error(`Error on Request : ${error.errno}\n Code : ${error.code}`);
+                            }
                         });
                     } while (self.IsValidResponse(response, 'KeepAlive') == false)
 
@@ -422,6 +513,13 @@ class RiscoPanelSession {
                         return status >= 200 && status < 400;
                     },
                     maxRedirects: 0,
+                })
+                .catch(function (error) {
+                    if (error.response){
+                        throw new Error(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
+                    } else {
+                        throw new Error(`Error on Request : ${error.errno}\n Code : ${error.code}`);
+                    }
                 });
             } while (self.IsValidResponse(response, 'DiscoverParts') == false)
 
@@ -449,10 +547,10 @@ class RiscoPanelSession {
                                 return 'disarmed';
                             }    
                         })(),
-                        armCommand: 'armed',
-                        nightCommand: 'partially',
-                        homeCommand: 'partially',
-                        disarmCommand: 'disarmed',
+                        armCommand: this.Custom_armCommand,
+                        nightCommand: this.Custom_nightCommand,
+                        homeCommand: this.Custom_homeCommand,
+                        disarmCommand: this.Custom_disarmCommand,
                         OnAlarm: false
                     };
                     Parts_Datas[0] = Part_Data;
@@ -468,10 +566,10 @@ class RiscoPanelSession {
                             ExitDelay: 0,
                             previousState: null,
                             actualState: (body.detectors.parts[PartId].armIcon).match(/ico-(.*)\.png/)[1],
-                            armCommand: 'armed',
-                            nightCommand: 'partially',
-                            homeCommand: 'partially',
-                            disarmCommand: 'disarmed',
+                            armCommand: this.Custom_armCommand,
+                            nightCommand: this.Custom_nightCommand,
+                            homeCommand: this.Custom_homeCommand,
+                            disarmCommand: this.Custom_disarmCommand,
                             OnAlarm: false
                         };
                         self.log.debug('Discovering Partition : %s with Id: %s', body.detectors.parts[PartId].name, body.detectors.parts[PartId].id);
@@ -529,6 +627,13 @@ class RiscoPanelSession {
                         return status >= 200 && status < 400;
                     },
                     maxRedirects: 0,
+                })
+                .catch(function (error) {
+                    if (error.response){
+                        throw new Error(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
+                    } else {
+                        throw new Error(`Error on Request : ${error.errno}\n Code : ${error.code}`);
+                    }
                 });
             } while (self.IsValidResponse(response, 'DiscoverGroups', false) == false)
 
@@ -633,6 +738,13 @@ class RiscoPanelSession {
                         return status >= 200 && status < 400;
                     },
                     maxRedirects: 0,
+                })
+                .catch(function (error) {
+                    if (error.response){
+                        throw new Error(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
+                    } else {
+                        throw new Error(`Error on Request : ${error.errno}\n Code : ${error.code}`);
+                    }
                 }); 
             } while (self.IsValidResponse(response, 'DiscoverOutputs', false) == false)
 
@@ -667,7 +779,7 @@ class RiscoPanelSession {
                                     if (Output_Cmd.match(/(\d)\)$/) == null) {
                                         return false;
                                     } else {
-                                       return  ((Math.abs(parseInt(Output_Cmd.match(/(\d)\)$/)[1]) - 1)) ? true : false);
+                                       return ((Math.abs(parseInt(Output_Cmd.match(/(\d)\)$/)[1]) - 1)) ? true : false);
                                     }
                                 })()
                         };
@@ -732,7 +844,14 @@ class RiscoPanelSession {
                         return status >= 200 && status < 400;
                     },
                     maxRedirects: 0,
-                }); 
+                })
+                .catch(function (error) {
+                    if (error.response){
+                        throw new Error(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
+                    } else {
+                        throw new Error(`Error on Request : ${error.errno}\n Code : ${error.code}`);
+                    }
+                });
             } while (self.IsValidResponse(response, 'DiscoverDetectors') == false)
 
             if (response.status == 200){
@@ -752,13 +871,7 @@ class RiscoPanelSession {
                             const DetectorId = response.data.detectors.parts[Parts].detectors[Detector].id;
                             var Detector_Data = {
                                 Id: DetectorId,
-                                StatusActive: (function() {
-                                            if (response.data.detectors.parts[Parts].detectors[Detector].bypassed === false){
-                                                return true;
-                                            } else {
-                                                return false;
-                                            }
-                                })(),
+                                StatusActive: response.data.detectors.parts[Parts].detectors[Detector].bypassed,
                                 Partition: Parts,
                                 Required: null,
                                 accessorytype: "Detector",
@@ -838,7 +951,14 @@ class RiscoPanelSession {
                         return status >= 200 && status < 400;
                     },
                     maxRedirects: 0,
-                });            
+                })
+                .catch(function (error) {
+                    if (error.response){
+                        throw new Error(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
+                    } else {
+                        throw new Error(`Error on Request : ${error.errno}\n Code : ${error.code}`);
+                    }
+                });
             } while (self.IsValidResponse(response, 'DiscoverCameras') == false)
 
             if (response.status == 200){
@@ -1079,13 +1199,7 @@ class RiscoPanelSession {
             for (var Parts in body.detectors.parts) {
                 for (var DetectorId in body.detectors.parts[Parts].detectors) {
                     const Id = body.detectors.parts[Parts].detectors[DetectorId].id;
-                    self.DiscoveredAccessories.Detectors[Id].StatusActive = (function() {
-                        if (body.detectors.parts[Parts].detectors[DetectorId].bypassed === false){
-                            return true;
-                        } else {
-                            return false;
-                        }
-                    })();
+                    self.DiscoveredAccessories.Detectors[Id].StatusActive = body.detectors.parts[Parts].detectors[DetectorId].bypassed;
                     self.DiscoveredAccessories.Detectors[Id].State = (function() {
                         if (body.detectors.parts[Parts].detectors[DetectorId].data_icon == 'detector2'){
                             return true;
@@ -1130,6 +1244,13 @@ class RiscoPanelSession {
                                 return status >= 200 && status < 400;
                             },
                             maxRedirects: 0,
+                        })
+                        .catch(function (error) {
+                            if (error.response){
+                                throw new Error(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
+                            } else {
+                                throw new Error(`Error on Request : ${error.errno}\n Code : ${error.code}`);
+                            }
                         });
                     } while (self.IsValidResponse(response, 'getCPStates') == false)
 
@@ -1230,6 +1351,13 @@ class RiscoPanelSession {
                         return status >= 200 && status < 400;
                     },
                     maxRedirects: 0,
+                })
+                .catch(function (error) {
+                    if (error.response){
+                        throw new Error(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
+                    } else {
+                        throw new Error(`Error on Request : ${error.errno}\n Code : ${error.code}`);
+                    }
                 });
             } while (self.IsValidResponse(response, "armDisarm") == false)
 
@@ -1256,7 +1384,7 @@ class RiscoPanelSession {
                 throw new Error(`Bad HTTP Response: ${response.status}`);
             }
         }catch(err){
-            self.log('Error on armDisarm function:\n%s', err);
+            self.log.error('Error on armDisarm function:\n%s', err);
             return [0, NaN];
         }
     }
@@ -1287,6 +1415,13 @@ class RiscoPanelSession {
                         return status >= 200 && status < 400;
                     },
                     maxRedirects: 0,
+                })
+                .catch(function (error) {
+                    if (error.response){
+                        throw new Error(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
+                    } else {
+                        throw new Error(`Error on Request : ${error.errno}\n Code : ${error.code}`);
+                    }
                 });
             } while (self.IsValidResponse(response, 'HACommand') == false)
 
@@ -1306,7 +1441,7 @@ class RiscoPanelSession {
                 throw new Error(`Bad HTTP Response: ${response.status}`);
             }
         }catch(err){
-            self.log('Error on HACommand function:\n%s', err);
+            self.log.error('Error on HACommand function:\n%s', err);
             return false;
         }
     }
@@ -1334,6 +1469,13 @@ class RiscoPanelSession {
                         return status >= 200 && status < 400;
                     },
                     maxRedirects: 0,
+                })
+                .catch(function (error) {
+                    if (error.response){
+                        throw new Error(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
+                    } else {
+                        throw new Error(`Error on Request : ${error.errno}\n Code : ${error.code}`);
+                    }
                 });
             } while (self.IsValidResponse(response, 'HACommand') == false)
 
@@ -1352,7 +1494,7 @@ class RiscoPanelSession {
                 throw new Error(`Bad HTTP Response: ${response.status}`);
             }
         }catch(err){
-            self.log('Error on SetBypass function:\n%s', err);
+            self.log.error('Error on SetBypass function:\n%s', err);
             return false;
         }
     }

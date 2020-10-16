@@ -190,6 +190,7 @@ class RiscoPanelPlatform {
                     if(add) {
                         this.log.info('Add or Modifying accessory %s', accessory.displayName);
                         accessory.addService(this.Custom_Types_Services[type], accessory.context.name);
+                        accessory.addService(Service.Switch, `Exclude ${accessory.displayName}`, `exclude_${accessory.context.name}`);
                     }else{
                         this.log.info('Configuring accessory %s',accessory.displayName);
                     }

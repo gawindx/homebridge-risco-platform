@@ -1,6 +1,6 @@
 {
   "name": "homebridge-risco-platform",
-  "version": "1.1.0",
+  "version": "1.1.3",
   "description": "RiscoAlarm Plugin Platform for Homebridge",
   "dependencies": {
     "polling-to-event": "^2.1.0",

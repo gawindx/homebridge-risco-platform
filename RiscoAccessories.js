@@ -97,6 +97,10 @@ class RiscoCPPartitions {
             emitter.on('err', function (err) {
                 self.log.error('Polling failed, error was %s', err);
             });
+
+            emitter.on('close', function () {
+                emitter.removeAllListeners();
+            });
         }
     }
 
@@ -191,6 +195,7 @@ class RiscoCPPartitions {
         } catch(err) {
             self.log.error('Error on RiscoCPPartitions/setTargetState:\n%s', err);
             typeof callback === 'function' && callback(null, self.riscoCurrentState);
+            return Promise.reject();
         }
     }
 
@@ -228,7 +233,7 @@ class RiscoCPPartitions {
         } catch(err) {
             self.log.error('Error on RiscoCPPartitions/getState:\n%s', err);
             callback(null, self.riscoCurrentState);
-            return
+            return Promise.reject();
         }
     }
 
@@ -261,7 +266,7 @@ class RiscoCPPartitions {
             self.log.error('Error on RiscoCPPartitions/getCurrentState:\n%s', err);
             self.mainService.setCharacteristic(self.Characteristic.SecuritySystemCurrentState, self.riscoCurrentState);
             callback(null, self.riscoCurrentState);
-            return
+            return Promise.reject();
         }
     }
 
@@ -314,7 +319,7 @@ class RiscoCPPartitions {
         } catch(err){
             self.log.error('Error on RiscoCPPartitions/getRefreshState:\n%s', err);
             callback(null, self.riscoCurrentState);
-            return
+            return Promise.reject();
         }
     }
 
@@ -394,6 +399,10 @@ class RiscoCPOutputs {
                 emitter.on('err', function (err) {
                     self.log.error('Polling failed, error was %s', err);
                 });
+
+                emitter.on('close', function () {
+                    emitter.removeAllListeners();
+                });
             }
         }
     }
@@ -424,7 +433,7 @@ class RiscoCPOutputs {
         } catch(err){
             self.log.error('Error on RiscoCPOutputs/getRefreshState:\n%s', err);
             callback(null, self.RiscoOutputState);
-            return
+            return Promise.reject();
         }
     }
 
@@ -462,7 +471,7 @@ class RiscoCPOutputs {
             self.log.error('Error on RiscoCPOutputs/getCurrentState:\n%s', err);
             self.mainService.setCharacteristic(self.Characteristic.On, self.RiscoOutputState);
             callback(null, self.RiscoOutputState);
-            return
+            return Promise.reject();
         }
     }
 
@@ -548,7 +557,8 @@ class RiscoCPBaseDetectors {
         this.Service = api.hap.Service;
         this.Characteristic = api.hap.Characteristic;
 
-        this.SetServicesAccessory()
+        this.SetServicesAccessory();
+        this.SetExcludeServicesAccessory();
 
         this.DetectorReady = false;
 
@@ -577,16 +587,28 @@ class RiscoCPBaseDetectors {
             emitter.on(self.long_event_name, function (state) {
 
                 self.log.info('%s "%s" => New state detected: (%s). Notify!', self.sPrefix, self.name, self.GetAccessoryState(state[0], false));
-                if (self.Type == 'Detector'){
-                    self.log.info('%s "%s" => New Active state detected (Not Bypassed=true) : (%s). Notify!', self.sPrefix, self.name, state[1]);
-                }
+                self.log.info('%s "%s" => New Bypass State detected : (%s). Notify!', self.sPrefix, self.name, ((state[1]) ? 'ByPassed' : 'Not ByPassed')) ;
                 self.ReportAccessoryState(state);
             });
 
             emitter.on('err', function (err) {
                 self.log.error('Polling failed, error was %s', err);
             });
+
+            emitter.on('close', function () {
+                emitter.removeAllListeners();
+            });
         }
+    }
+
+    SetExcludeServicesAccessory(){
+        var self = this;
+        self.log.debug('Adding Exclude Switch to %s', this.name);
+        this.ExcludeService = this.accessory.getService(this.Service.Switch, this.accessory.displayName);
+        this.ExcludeService
+            .getCharacteristic(this.Characteristic.On)
+            .on('get', this.getCurrentExcludeState.bind(this))
+            .on('set', this.setCurrentExcludeState.bind(this));
     }
 
     async getRefreshState(callback) {
@@ -612,7 +634,7 @@ class RiscoCPBaseDetectors {
             self.log.error('Error on RiscoCPBaseDetectors/getRefreshState:\n%s', err);
             callback(null, [self.RiscoDetectorState, self.RiscoDetectorActiveState]);
             self.DetectorReady = true;
-            return
+            return Promise.reject();
         }
     }
 
@@ -621,21 +643,19 @@ class RiscoCPBaseDetectors {
         try{
             if (self.polling){
                 self.log.debug('%s "%s" MotionDetected: %s', self.sPrefix, self.name, self.GetAccessoryState(self.RiscoDetectorState, false));
-                self.log.debug('%s "%s" is Active (Not Bypassed=true): %s',self.sPrefix, self.name, self.RiscoDetectorActiveState);
-                callback(null, [self.RiscoDetectorState, self.RiscoDetectorActiveState]);
+                callback(null, self.RiscoDetectorState);
             } else {
                 self.log.info('%s "%s" =>Getting current state - delayed...', self.sPrefix, self.name);
                 waitUntil()
                     .interval(500)
                     .times(15)
                     .condition(function () {
-                        return ( (self.RiscoDetectorState ? true : false) || (self.RiscoDetectorActiveState ? true : false));
+                        return (self.RiscoDetectorState ? true : false);
                     })
                     .done(async function (result) {
                         await self.RiscoSession.getCPStates();
                         await self.getRefreshState(callback);
                         self.log.debug('%s "%s" => Actual Motion state is: (%s)', self.sPrefix, self.name, self.GetAccessoryState(self.RiscoDetectorState, false));
-                        self.log.debug('%s "%s" => Actual Active (Not Bypassed=true) is: (%s)', self.sPrefix, self.name, self.RiscoDetectorActiveState);
                         self.DetectorReady = true;
                         self.ReportAccessoryState();
                         return
@@ -644,8 +664,8 @@ class RiscoCPBaseDetectors {
         } catch (err) {
             self.log.error('Error on RiscoCPBaseDetectors/getCurrentState:\n%s', err);
             self.ReportAccessoryState();
-            callback(null, [self.RiscoDetectorState, self.RiscoDetectorActiveState]);
-            return
+            callback(null, self.RiscoDetectorState);
+            return Promise.reject();
         }
     }
 
@@ -670,10 +690,67 @@ class RiscoCPBaseDetectors {
                 if (!self.polling){
                     self.log.info('%s "%s" => Set new Bypass state: (%s)', self.sPrefix, self.name, state);
                 }
-                typeof callback === 'function' && callback(null, [self.RiscoDetectorState, self.RiscoDetectorActiveState]);
+                typeof callback === 'function' && callback(null, self.RiscoDetectorState);
             } else {
                 self.log.error('Error on SetBypass!!!');
-                typeof callback === 'function' && callback(null, [self.RiscoDetectorState, self.RiscoDetectorActiveState]);
+                typeof callback === 'function' && callback(null, self.RiscoDetectorState);
+            }
+        }
+    }
+
+    async getCurrentExcludeState(callback) {
+        var self = this;
+        try{
+            if (self.polling){
+                self.log.debug('%s "%s" Exclude State : %s', self.sPrefix, self.name, ((self.RiscoDetectorActiveState) ? 'Bypassed': 'Not Bypassed'));
+                callback(null, ((self.RiscoDetectorActiveState) ? false: true));
+            } else {
+                self.log.info('%s "%s" =>Getting current state - delayed...', self.sPrefix, self.name);
+                waitUntil()
+                    .interval(500)
+                    .times(15)
+                    .condition(function () {
+                        return ((self.RiscoDetectorActiveState) ? false: true);
+                    })
+                    .done(async function (result) {
+                        await self.RiscoSession.getCPStates();
+                        await self.getRefreshState(callback);
+                        self.log.debug('%s "%s" => Actual Exclude State is: %s', self.sPrefix, self.name, ((self.RiscoDetectorActiveState) ? 'Bypassed': 'Not Bypassed'));
+                        self.DetectorReady = true;
+                        return
+                    });
+            }
+        } catch (err) {
+            self.log.error('Error on RiscoCPBaseDetectors/getCurrentState:\n%s', err);
+            callback(null, ((self.RiscoDetectorActiveState) ? false: true));
+            return Promise.reject();
+        }
+    }
+
+    async setCurrentExcludeState(state, callback) {
+        var self = this;
+        if (self.DetectorReady){
+            state = (state) ? false : true;
+            self.log.debug('Set Exclude State of %s "%s" to: %s', self.sPrefix, self.name, ((state) ? 'Bypassed': 'Not Bypassed'));
+            var SBpResp;
+            self.log.debug('%s Actual State: %s', self.name, ((self.RiscoDetectorActiveState) ? 'Bypassed': 'Not Bypassed'));
+            self.log.debug('%s New State: %s', self.name, ((state) ? 'Bypassed': 'Not Bypassed'));
+            if (self.RiscoDetectorActiveState == state) {
+                SBpResp = true;
+                self.log.debug('%s Identical State', self.name);
+            } else {
+                SBpResp = await self.RiscoSession.SetBypass(state, self.RiscoDetectorId);
+                self.log.debug('%s Different State', self.name);
+            }
+
+            if (SBpResp){
+                if (!self.polling){
+                    self.log.info('%s "%s" => Set new Bypass state: (%s)', self.sPrefix, self.name, state);
+                }
+                typeof callback === 'function' && callback(null);
+            } else {
+                self.log.error('Error on SetBypass!!!');
+                typeof callback === 'function' && callback(null);
             }
         }
     }
@@ -699,9 +776,6 @@ class RiscoCPDetectors extends RiscoCPBaseDetectors {
         this.mainService
             .getCharacteristic(this.Characteristic.MotionDetected)
             .on('get', this.getCurrentState.bind(this));
-        /*this.detectorService
-            .getCharacteristic(this.Characteristic.Active)
-            .on('set', this.setCurrentState.bind(this));*/
         this.mainService
             .getCharacteristic(this.Characteristic.StatusActive)
             .on('set', this.setCurrentState.bind(this));
@@ -716,12 +790,10 @@ class RiscoCPDetectors extends RiscoCPBaseDetectors {
         }
         try{
             self.mainService.setCharacteristic(self.Characteristic.MotionDetected, self.GetAccessoryState(self.RiscoDetectorState));
-            self.mainService.setCharacteristic(self.Characteristic.StatusActive, self.RiscoDetectorActiveState);
-            //self.mainService.setCharacteristic(self.Characteristic.Active, self.RiscoDetectorActiveState);
-            return
+            return;
         } catch(err){
             self.log.error('Error on RiscoCPDetectors/ReportAccessoryState:\n%s', err);;
-            return
+            return;
         }
     }
 
@@ -748,11 +820,6 @@ class RiscoCPCDoor extends RiscoCPBaseDetectors {
         this.mainService
             .getCharacteristic(this.Characteristic.CurrentPosition)
             .on('get', this.getCurrentState.bind(this));
-        /*
-        The following seems incompatible with the 'home Apple' application and generates warnings from Homekit 
-        this.mainService
-            .getCharacteristic(this.Characteristic.StatusActive)
-            .on('set', this.setCurrentState.bind(this));*/
         this.sPrefix = 'Door Contact';
     }
 
@@ -765,10 +832,10 @@ class RiscoCPCDoor extends RiscoCPBaseDetectors {
         try{
             self.mainService.setCharacteristic(self.Characteristic.CurrentPosition, self.GetAccessoryState(self.RiscoDetectorState));
             self.mainService.setCharacteristic(self.Characteristic.TargetPosition, self.GetAccessoryState(self.RiscoDetectorState));
-            return
+            return;
         } catch(err){
             self.log.error('Error on RiscoCPCDoor/ReportAccessoryState:\n%s', err);
-            return
+            return;
         }
     }
 
@@ -795,11 +862,6 @@ class RiscoCPCWindow extends RiscoCPBaseDetectors {
         this.mainService
             .getCharacteristic(this.Characteristic.CurrentPosition)
             .on('get', this.getCurrentState.bind(this));
-        /*
-        The following seems incompatible with the 'home Apple' application and generates warnings from Homekit 
-        this.mainService
-            .getCharacteristic(this.Characteristic.StatusActive)
-            .on('set', this.setCurrentState.bind(this));*/
         this.sPrefix = 'Window Contact';
     }
 
@@ -812,10 +874,10 @@ class RiscoCPCWindow extends RiscoCPBaseDetectors {
         try{
             self.mainService.setCharacteristic(self.Characteristic.CurrentPosition, self.GetAccessoryState(self.RiscoDetectorState));
             self.mainService.setCharacteristic(self.Characteristic.TargetPosition, self.GetAccessoryState(self.RiscoDetectorState));
-            return
+            return;
         } catch(err){
             self.log.error('Error on RiscoCPCWindow/ReportAccessoryState:\n%s', err);;
-            return
+            return;
         }
     }
 
@@ -842,11 +904,6 @@ class RiscoCPCContactSensor extends RiscoCPBaseDetectors {
         this.mainService
             .getCharacteristic(this.Characteristic.ContactSensorState)
             .on('get', this.getCurrentState.bind(this));
-        /*
-        The following seems incompatible with the 'home Apple' application and generates warnings from Homekit 
-        this.mainService
-            .getCharacteristic(this.Characteristic.StatusActive)
-            .on('set', this.setCurrentState.bind(this));*/
         this.sPrefix = 'Contact Sensor';
     }
 
@@ -858,11 +915,10 @@ class RiscoCPCContactSensor extends RiscoCPBaseDetectors {
         }
         try{
             self.mainService.setCharacteristic(self.Characteristic.ContactSensorState, self.GetAccessoryState(self.RiscoDetectorState));
-            self.mainService.setCharacteristic(self.Characteristic.StatusActive, self.GetAccessoryState(self.RiscoDetectorState));
-            return
+            return;
         } catch(err){
             self.log.error('Error on RiscoCPCContactSensor/ReportAccessoryState:\n%s', err);
-            return
+            return;
         }
     }
 

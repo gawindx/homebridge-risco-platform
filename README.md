@@ -4,12 +4,20 @@ Integration works only when proper Ethernet module is added to your Risco Unit a
 When Polling option is enabled, Alarm state is refreshed in background, that means when you open HomeApp - there is no delay to display RiscoAlarm status. It's retreived from cached value.
 
 Note:
-From version 1.1.0, homebridge-risco-platform is a dynamic platform.
+*From version 1.1.0, homebridge-risco-platform is a dynamic platform.
 This change means that:
-- The accessories created are cached to be reused after each restart of Homebridge
-- A recharged accessory retains all its characteristics and remains associated with its scene or automation, so it is no longer necessary to reconfigure its automation as it was before
-- When modifying the platform configuration, the accessories are modified accordingly (modification of type or deletion if no longer used)
-- A deleted accessory must therefore be re-associated with its automations because it will have been deleted from the Homebridge accessories cache
+*- The accessories created are cached to be reused after each restart of Homebridge
+*- A recharged accessory retains all its characteristics and remains associated with its scene or automation, so it is no longer necessary to reconfigure its automation as it was before
+*- When modifying the platform configuration, the accessories are modified accordingly (modification of type or deletion if no longer used)
+*- A deleted accessory must therefore be re-associated with its automations because it will have been deleted from the Homebridge accessories cache*
+
+Note:
+*Since version 1.1.3, you can Exclude (or bypass) a detector directly from HomeKit.
+It can happen that the request takes a little too long to execute and, in this case, you may see an information appear in the Homebridge logs indicating that the accessory is taking too long to respond. Example:
+`
+The write handler for the characteristic 'On' on the accessory 'X' was slow to respond!*
+`
+This is not an issue but quite normal behavior.*
 
 # Installation
 
@@ -32,8 +40,13 @@ Configuration sample:
             "riscoPassword": "",
             "riscoSiteId": 12345,
             "riscoPIN": "",
-            "polling": true | false,
+            "polling": true|false,
             "pollInterval": 10000,
+            "Partition_Mode": true|false,
+            "armCommand": "armed|partially|disarmed",
+            "partialCommand": "armed|partially|disarmed",
+            "homeCommand": "armed|partially|disarmed",
+            "disarmCommand": "armed|partially|disarmed",
             "Partition": "all|none|system|0,1,2,....",
             "Groups": "all|none|0,1,2,....",
             "Outputs": "all|none|0,1,2,....",
@@ -56,7 +69,18 @@ Fields:
 * "riscoPIN"=> Mandatory: PIN Code used for arm/disarm
 * "polling" => optional: true|false - poll for latest RiscoCloud status (Default to false)
 * "pollInterval" => optional: time in ms for polling (Default to 10000)
-* "Partition_Mode": false by default ("System"). Set to true if you want to manage one or more partitions independently.
+* "armCommand": Override default value for arming (default to "armed"). 
+    Accept any of this value :
+    * "armed" : set Partition/System to "armed"
+    * "partially" : set Partition/System to "partially armed" (for example when you stay at home)
+    * "disarmed" : set Partition/System to "disarmed"
+    *See Notes 1 and 2 below*
+* "partialCommand": Override default value for arming (default to "armed").
+    Accepts the same values as for "armCommand".
+* "homeCommand": Override default value for arming (default to "armed").
+    Accepts the same values as for "armCommand".
+* "disarmCommand": Override default value for arming (default to "armed").
+    Accepts the same values as for "armCommand"
 * "Partition" => optional: accept the following options
     * "none": will not generate an accessory for partitions
     * "all": will generate an accessory for each partition
@@ -93,12 +117,17 @@ Fields:
         * "0,1,...": will modify a list of Detector to Windows.
         Accepts a comma-separated list of string where each member is the id of a Detector
 
+*Notes 1 : Since groups can only have 2 states, whether armed or disarmed, the options "armCommand", "nightCommand" ,"homeCommand" and "disarmCommand" only apply to Partitions and system mode.*
+
+*Notes 2 : Given that the platform allows you to choose the partition(s) managed by HomeKit, the possibility of managing arming/night/home/disarming commands linked to a specific partition has not been implemented because this would be nonsense (specific command of the type: "1:armed "or" 1:disarmed ")*
+
 For the moment (v1.1.0), it is only possible to indicate if the real type of the detector is:
 - Door contact
 - Window contact
 - Contact Sensor
 
 If no accessory is generated, the system mode operation will be set by default.
+
 
 
 ## How to Identify the ID of a Detector
@@ -139,9 +168,7 @@ In that case "12345" is your siteId which should be placed in new config file.
 
 
 ## TODO:
-* Add the ability to set the arming / partial / night / disarm commands
 * Allow the ability to monitor panels from multiple sites (only from the same RiscoCloud account) - requires modification of 'app.js' and 'risco.js'
-* Edit the RiscoAccessories file to simplify the declaration of accessories using a common trunk to all accessories
 * Add Cameras (Partially done but may not be usable)
 * Add the ability to define custom detector types - Partially made with the support of "Custom" detectors
 (water / fire / gas / CO2 / temperature threshold detector) as the risco hardware supports. This information does not go back in the interface RiscoCloud, it requires a manual addition.
