@@ -988,6 +988,47 @@ class RiscoCPCContactSensor extends RiscoCPBaseDetectors {
     }
 }
 
+class RiscoCPVibrateSensor extends RiscoCPBaseDetectors {
+    constructor (log, accConfig, api, accessory) {
+        super(log, accConfig, api, accessory);
+    }
+
+    SetServicesAccessory(){
+        this.mainService = this.accessory.getService(this.Service.MotionSensor, this.accessory.displayName);
+        this.mainService
+            .getCharacteristic(this.Characteristic.MotionDetected)
+            .on('get', this.getCurrentState.bind(this));
+        this.sPrefix = 'Vibrate';
+    }
+
+    ReportAccessoryState(state = null) {
+        var self = this;
+        if (!state){
+            self.RiscoDetectorState = state[0];
+            self.RiscoDetectorActiveState = state[1];
+        }
+        try{
+            self.mainService.setCharacteristic(self.Characteristic.MotionDetected, self.GetAccessoryState(self.RiscoDetectorState));
+            return;
+        } catch(err){
+            self.log.error('Error on RiscoCPDetectors/ReportAccessoryState:\n%s', err);;
+            return;
+        }
+    }
+
+    GetAccessoryState(state, AsHomeKitValue = true) {
+        /*
+        Adapt the status of the accessory according to the response expected by Homekit according to the type of accessory
+        */
+        var self = this;
+        if (AsHomeKitValue){
+            return ((state) ? true : false);
+        } else {
+            return ((state) ? 'Active' : 'Inactive');
+        }
+    }
+}
+
 module.exports = {
     RiscoCPPartitions: RiscoCPPartitions,
     RiscoCPGroups: RiscoCPGroups,
@@ -995,5 +1036,6 @@ module.exports = {
     RiscoCPDetectors: RiscoCPDetectors,
     RiscoCPCDoor: RiscoCPCDoor,
     RiscoCPCWindow: RiscoCPCWindow,
-    RiscoCPCContactSensor: RiscoCPCContactSensor
+    RiscoCPCContactSensor: RiscoCPCContactSensor,
+    RiscoCPVibrateSensor: RiscoCPVibrateSensor
 }

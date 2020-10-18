@@ -113,21 +113,25 @@ Fields:
         * "0,1,...": will modify a list of Detector to Windows.
         Accepts a comma-separated list of string where each member is the id of a Detector
     * "Contact Sensor"=> optional: accept the following options
-        * "all": will modify all Detector to Windows
-        * "0,1,...": will modify a list of Detector to Windows.
+        * "all": will modify all Detector to Contact Sensors.
+        * "0,1,...": will modify a list of Detector to Contact Sensors.
         Accepts a comma-separated list of string where each member is the id of a Detector
+    * "Vibrate Sensor"=> optional: accept the following options
+        * "all": will modify all Detector to Vibrate Sensors.
+        * "0,1,...": will modify a list of Detector to Vibrate Sensors.
+        Accepts a comma-separated list of string where each member is the id of a Detecto
 
 *Notes 1 : Since groups can only have 2 states, whether armed or disarmed, the options "armCommand", "nightCommand" ,"homeCommand" and "disarmCommand" only apply to Partitions and system mode.*
 
 *Notes 2 : Given that the platform allows you to choose the partition(s) managed by HomeKit, the possibility of managing arming/night/home/disarming commands linked to a specific partition has not been implemented because this would be nonsense (specific command of the type: "1:armed "or" 1:disarmed ")*
 
-For the moment (v1.1.0), it is only possible to indicate if the real type of the detector is:
+For the moment (v1.1.5), it is only possible to indicate if the real type of the detector is:
 - Door contact
 - Window contact
 - Contact Sensor
+- Vibrate Sensor *(The Risco equipment only reports the alarm state of the vibration contact, the sensor is therefore managed as a movement sensor and its integration does not allow the recovery of additional information such as an accelerometer.)*
 
 If no accessory is generated, the system mode operation will be set by default.
-
 
 
 ## How to Identify the ID of a Detector

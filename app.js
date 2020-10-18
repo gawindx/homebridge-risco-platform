@@ -21,14 +21,16 @@ class RiscoPanelPlatform {
             'Detector': Service.MotionSensor,
             'Door': Service.Door,
             'Window': Service.Window,
-            'Contact Sensor': Service.ContactSensor
+            'Contact Sensor': Service.ContactSensor,
+            'Vibrate Sensor': Service.MotionSensor
         };
         //Classes Associated to Custom Types
         this.Custom_Types_Classes = {
             'Detector': 'RiscoCPDetectors',
             'Door': 'RiscoCPCDoor',
             'Window': 'RiscoCPCWindow',
-            'Contact Sensor': 'RiscoCPCContactSensor'
+            'Contact Sensor': 'RiscoCPCContactSensor',
+            'Vibrate Sensor': 'RiscoCPVibrateSensor',
         }
 
         this.accessories = [];
