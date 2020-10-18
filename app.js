@@ -164,6 +164,7 @@ class RiscoPanelPlatform {
             case 'Partitions':
                 if(add) {
                     accessory.addService(Service.SecuritySystem, accessory.context.name);
+                    accessory.addService(Service.OccupancySensor, `Occupancy ${accessory.displayName}`, `occupancy_${accessory.context.name}`);
                 }else{
                     this.log.info('Configuring accessory %s', accessory.displayName);
                 }

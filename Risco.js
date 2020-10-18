@@ -551,6 +551,7 @@ class RiscoPanelSession {
                         nightCommand: this.Custom_nightCommand,
                         homeCommand: this.Custom_homeCommand,
                         disarmCommand: this.Custom_disarmCommand,
+                        Ready: true,
                         OnAlarm: false
                     };
                     Parts_Datas[0] = Part_Data;
@@ -570,6 +571,8 @@ class RiscoPanelSession {
                             nightCommand: this.Custom_nightCommand,
                             homeCommand: this.Custom_homeCommand,
                             disarmCommand: this.Custom_disarmCommand,
+                            Ready: true,
+                            PReady: true, 
                             OnAlarm: false
                         };
                         self.log.debug('Discovering Partition : %s with Id: %s', body.detectors.parts[PartId].name, body.detectors.parts[PartId].id);
@@ -660,7 +663,6 @@ class RiscoPanelSession {
                             longName: `group_${GroupId}_${(Gname.toLowerCase()).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ /g, '_')}`,
                             parentPart: (function(){
                                 var resultArray = [];
-                                self.log('parentpart');
                                 for (var ParentPart in ParentPartList) {
                                     var ParentPartId = ParentPartList[ParentPart].match(new RegExp('<label data-groups=".*?' + GroupName + '.*?">.*<.*OpenPartGroups\\("(\\d*?)"','gm'));
                                     if (ParentPartId != null ){
@@ -871,7 +873,7 @@ class RiscoPanelSession {
                             const DetectorId = response.data.detectors.parts[Parts].detectors[Detector].id;
                             var Detector_Data = {
                                 Id: DetectorId,
-                                StatusActive: response.data.detectors.parts[Parts].detectors[Detector].bypassed,
+                                Bypassed: response.data.detectors.parts[Parts].detectors[Detector].bypassed,
                                 Partition: Parts,
                                 Required: null,
                                 accessorytype: "Detector",
@@ -1109,6 +1111,37 @@ class RiscoPanelSession {
                 if ((self.DiscoveredAccessories.Partitions[0].OnAlarm == true) && (self.DiscoveredAccessories.Partitions[0].actualState == 'disarmed')){
                     self.DiscoveredAccessories.Partitions[0].OnAlarm = false;
                 }
+                //Determine Occupancy State
+                if (body.detectors != null) {
+                    var ReadyState = true;
+                    var PReadyState = true;
+                    for (var PartId in body.detectors.parts) {
+                        const Detectors = JSON.parse(JSON.stringify(body.detectors.parts[Id].detectors));
+                        Object.values(Detectors).filter(detector => {
+                            if (detector.data_icon == 'detector2'){
+                                return true;
+                            } else {
+                                return false;
+                            }
+                        })
+                        .forEach(detector => {
+                            if (detector.bypassed == false){
+                                if (self.DiscoveredAccessories.Detectors[detector.id].accessorytype != "Detector" ){
+                                    PReadyState = false;
+                                }
+                                ReadyState = false;
+                            }
+                        });
+                    }
+                    self.DiscoveredAccessories.Partitions[0].Ready = ReadyState;
+                    self.DiscoveredAccessories.Partitions[0].PReady = PReadyState;
+                    if (ReadyState === false) {
+                        self.log.debug('Motion Is Detected, set System to Occupied');
+                    }
+                    if (PReadyState === false) {
+                        self.log.debug('System is Occupied inside home');
+                    }
+                }
             } else {
                 self.log.debug('Partition Mode');
                 if (Math.max(body.ExitDelayTimeout) != 0){
@@ -1121,12 +1154,40 @@ class RiscoPanelSession {
                 }
                 if (body.detectors != null) {
                     for (var PartId in body.detectors.parts) {
-                       const Id = body.detectors.parts[PartId].id;
-                       self.DiscoveredAccessories.Partitions[Id].previousState = self.DiscoveredAccessories.Partitions[Id].actualState;
-                       self.DiscoveredAccessories.Partitions[Id].actualState = (body.detectors.parts[PartId].armIcon).match(/ico-(.*)\.png/)[1];
+                        const Id = body.detectors.parts[PartId].id;
+                        const Detectors = JSON.parse(JSON.stringify(body.detectors.parts[Id].detectors));
+                        var ReadyState = true;
+                        var PReadyState = true;
+
+                        self.DiscoveredAccessories.Partitions[Id].previousState = self.DiscoveredAccessories.Partitions[Id].actualState;
+                        self.DiscoveredAccessories.Partitions[Id].actualState = (body.detectors.parts[PartId].armIcon).match(/ico-(.*)\.png/)[1];
                         self.log.debug('Partition Id: %s Label: %s',Id, self.DiscoveredAccessories.Partitions[Id].name)
                         self.log.debug('Previous State: %s', self.DiscoveredAccessories.Partitions[Id].previousState);
                         self.log.debug('Actual State: %s', self.DiscoveredAccessories.Partitions[Id].actualState);
+                        //Determine Occupancy State
+                        Object.values(Detectors).filter(detector => {
+                            if (detector.data_icon == 'detector2'){
+                                return true;
+                            } else {
+                                return false;
+                            }
+                        })
+                        .forEach(detector => {
+                            if (detector.bypassed == false){
+                                if (self.DiscoveredAccessories.Detectors[detector.id].accessorytype != "Detector" ){
+                                    PReadyState = false;
+                                }
+                                ReadyState = false;
+                            }
+                        });
+                        self.DiscoveredAccessories.Partitions[Id].Ready = ReadyState;
+                        self.DiscoveredAccessories.Partitions[Id].PReady = PReadyState;
+                        if (ReadyState === false) {
+                            self.log.debug('Motion Is Detected, set Partitions "%s" to Occupied', self.DiscoveredAccessories.Partitions[Id].name);
+                        }
+                        if (PReadyState === false) {
+                            self.log.debug('Partitions "%s" is Occupied inside home', self.DiscoveredAccessories.Partitions[Id].name);
+                        }
                     }
                 }
                 var Partitions = JSON.parse(JSON.stringify(self.DiscoveredAccessories.Partitions));
@@ -1150,23 +1211,22 @@ class RiscoPanelSession {
         self.log.debug('Entering getGroupsStates function');
         try {
             for (var GroupId in body.allGrpState.GlobalState) {
-                const Id = body.allGrpState.GlobalState[GroupId].id;
+                const Id = body.allGrpState.GlobalState[GroupId].Id;
                 self.DiscoveredAccessories.Groups[Id].previousState = self.DiscoveredAccessories.Groups[Id].actualState;
                 self.DiscoveredAccessories.Groups[Id].actualState = (function(){
                         self.log.debug('Group Armed State? ' + body.allGrpState.GlobalState[GroupId].Armed);
-                        self.log.debug(body.allGrpState.GlobalState);
                         return ((body.allGrpState.GlobalState[GroupId].Armed != false)?'armed':'disarmed');
                     })();
                 self.log.debug('Group Id: %s Label: %s', Id, self.DiscoveredAccessories.Groups[Id].name)
                 self.log.debug('Previous State: %s', self.DiscoveredAccessories.Groups[Id].previousState);
                 self.log.debug('Actual State: %s', self.DiscoveredAccessories.Groups[Id].actualState);
             }
-            var Groups = JSON.parse(JSON.stringify(self.DiscoveredAccessories.Groups));
+            const Groups = JSON.parse(JSON.stringify(self.DiscoveredAccessories.Groups));
             Object.values(Groups).filter(group => ((group.OnAlarm == true) && (group.actualState == 'disarmed')))
-                .forEach(group => (function(){
+                .forEach(group => {
                     self.log.debug('Groups %s Reset OnAlarm State', group.name);
                     self.DiscoveredAccessories.Groups[group.Id].OnAlarm = false;
-            })());
+            });
             self.log.debug('Leaving getGroupsStates function');
             return Promise.resolve();
         } catch (err) {
@@ -1199,7 +1259,7 @@ class RiscoPanelSession {
             for (var Parts in body.detectors.parts) {
                 for (var DetectorId in body.detectors.parts[Parts].detectors) {
                     const Id = body.detectors.parts[Parts].detectors[DetectorId].id;
-                    self.DiscoveredAccessories.Detectors[Id].StatusActive = body.detectors.parts[Parts].detectors[DetectorId].bypassed;
+                    self.DiscoveredAccessories.Detectors[Id].Bypassed = body.detectors.parts[Parts].detectors[DetectorId].bypassed;
                     self.DiscoveredAccessories.Detectors[Id].State = (function() {
                         if (body.detectors.parts[Parts].detectors[DetectorId].data_icon == 'detector2'){
                             return true;
@@ -1207,7 +1267,7 @@ class RiscoPanelSession {
                             return false;
                         }
                     })();
-                    self.log.debug('Detector Id: %s Label: %s', Id, self.DiscoveredAccessories.Detectors[Id].name)
+                    self.log.debug('Detector Id: %s Label: %s State:', Id, self.DiscoveredAccessories.Detectors[Id].name, ((self.DiscoveredAccessories.Detectors[Id].State)? 'Motion Detected' : 'Motion not Detected'));
                 }
             }
             self.log.debug('Leaving getDetectorsStates function');
