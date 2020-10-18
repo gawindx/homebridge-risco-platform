@@ -35,5 +35,5 @@
   },
   "homepage": "https://github.com/gawindx/homebridge-risco-platform#readme",
   "author": "Gawindx",
-  "publishConfig": { "registry": "https://npm.pkg.github.com/" }
+  "publishConfig": { "registry": "https://registry.npmjs.org/" }
 }
