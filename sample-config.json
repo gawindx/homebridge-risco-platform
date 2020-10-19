@@ -21,7 +21,9 @@
             "Custom": {
                 "Door": "all|0,1,2,....",
                 "Window": "all|0,1,2,....",
-                "Contact Sensor": "all|0,1,2,...."
+                "Contact Sensor": "all|0,1,2,....",
+                "Vibrate Sensor": "all|0,1,2,....",
+                "Smoke Sensor": "all|0,1,2,....",
             }
         }
     ]

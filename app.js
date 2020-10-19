@@ -15,14 +15,21 @@ let Service, Characteristic, UUIDGen;
 class RiscoPanelPlatform {
     constructor(log, config, api) {
         //Types of Custom Detector
-        this.Custom_Types = ['Detector', 'Door', 'Window', 'Contact Sensor'];
+        this.Custom_Types = [   'Detector',
+                                'Door',
+                                'Window',
+                                'Contact Sensor',
+                                'Vibrate Sensor',
+                                'Smoke Sensor'
+                            ];
         //Service Associated to Custom Types
         this.Custom_Types_Services = {
             'Detector': Service.MotionSensor,
             'Door': Service.Door,
             'Window': Service.Window,
             'Contact Sensor': Service.ContactSensor,
-            'Vibrate Sensor': Service.MotionSensor
+            'Vibrate Sensor': Service.MotionSensor,
+            'Smoke Sensor': Service.SmokeSensor
         };
         //Classes Associated to Custom Types
         this.Custom_Types_Classes = {
@@ -30,7 +37,8 @@ class RiscoPanelPlatform {
             'Door': 'RiscoCPCDoor',
             'Window': 'RiscoCPCWindow',
             'Contact Sensor': 'RiscoCPCContactSensor',
-            'Vibrate Sensor': 'RiscoCPVibrateSensor',
+            'Vibrate Sensor': 'RiscoCPCVibrateSensor',
+            'Smoke Sensor': 'RiscoCPCSmokeSensor'
         }
 
         this.accessories = [];
@@ -145,7 +153,6 @@ class RiscoPanelPlatform {
 
     _addOrConfigure(accessory, object, type, add) {
         if (type !== object.context.accessorytype) {
-            var self = this;
             this.log.debug('Accessory: %s Modified Since Last Run', object.context.name)
             add = true;
             accessory.removeService(accessory.getService(this.Custom_Types_Services[type]));
@@ -161,6 +168,7 @@ class RiscoPanelPlatform {
                 .setCharacteristic(Characteristic.SerialNumber, pjson.version)
                 .setCharacteristic(Characteristic.FirmwareRevision, pjson.version);
         }
+
         switch(type) {
             case 'System':
             case 'Partitions':
@@ -192,10 +200,24 @@ class RiscoPanelPlatform {
                 if (this.Custom_Types.includes(type)) {
                     if(add) {
                         this.log.info('Add or Modifying accessory %s', accessory.displayName);
-                        accessory.addService(this.Custom_Types_Services[type], accessory.context.name);
-                        accessory.addService(Service.Switch, `Exclude ${accessory.displayName}`, `exclude_${accessory.context.name}`);
+                        for (var AccTypes in this.Custom_Types_Services){
+                            if ((AccTypes != type) && (accessory.getService(this.Custom_Types_Services[AccTypes]) != undefined)) {
+                                this.log.debug('Service %s already defined on accessory %s', AccTypes, accessory.displayName);
+                                this.log.debug('This service is not required anymore ; remove it');
+                                accessory.removeService(this.Custom_Types_Services[AccTypes]);
+                            }
+                        }
+                        if (accessory.getService(this.Custom_Types_Services[type]) == undefined ) {
+                            this.log.debug('Service %s not already defined on accessory %s', type, accessory.displayName);
+                            accessory.addService(this.Custom_Types_Services[type], accessory.context.name);
+                        }
+                        if (accessory.getService(Service.Switch) == undefined ) {
+                            this.log.debug('Service Exclude not already defined on accessory %s', accessory.displayName);
+                            accessory.addService(Service.Switch, `Exclude ${accessory.displayName}`, `exclude_${accessory.context.name}`);
+                        }
                     }else{
                         this.log.info('Configuring accessory %s',accessory.displayName);
+
                     }
                     new riscoAccessory[this.Custom_Types_Classes[type]](this.log, object, this.api, accessory);
                 }
