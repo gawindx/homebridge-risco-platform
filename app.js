@@ -177,6 +177,10 @@ class RiscoPanelPlatform {
                     accessory.addService(Service.OccupancySensor, `Occupancy ${accessory.displayName}`, `occupancy_${accessory.context.name}`);
                 }else{
                     this.log.info('Configuring accessory %s', accessory.displayName);
+                    if (accessory.getService(Service.OccupancySensor) == undefined ) {
+                        this.log.debug('Service Exclude not already defined on accessory %s', accessory.displayName);
+                        accessory.addService(Service.OccupancySensor, `Occupancy ${accessory.displayName}`, `occupancy_${accessory.context.name}`);
+                    }
                 }
                 new riscoAccessory.RiscoCPPartitions(this.log, object, this.api, accessory);
                 break;
@@ -217,7 +221,10 @@ class RiscoPanelPlatform {
                         }
                     }else{
                         this.log.info('Configuring accessory %s',accessory.displayName);
-
+                        if (accessory.getService(Service.Switch) == undefined ) {
+                            this.log.debug('Service Exclude not already defined on accessory %s', accessory.displayName);
+                            accessory.addService(Service.Switch, `Exclude ${accessory.displayName}`, `exclude_${accessory.context.name}`);
+                        }
                     }
                     new riscoAccessory[this.Custom_Types_Classes[type]](this.log, object, this.api, accessory);
                 }
