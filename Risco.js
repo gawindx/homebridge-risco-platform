@@ -876,7 +876,7 @@ class RiscoPanelSession {
                                 Bypassed: response.data.detectors.parts[Parts].detectors[Detector].bypassed,
                                 Partition: Parts,
                                 Required: null,
-                                accessorytype: "Detector",
+                                accessorytype: 'Detector',
                                 name: DetectorName,
                                 longName: `det_${DetectorId}_${(DetectorName.toLowerCase()).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ /g, '_')}`,
                                 State: (function() {
@@ -1116,7 +1116,7 @@ class RiscoPanelSession {
                     var ReadyState = true;
                     var PReadyState = true;
                     for (var PartId in body.detectors.parts) {
-                        const Detectors = JSON.parse(JSON.stringify(body.detectors.parts[Id].detectors));
+                        const Detectors = JSON.parse(JSON.stringify(body.detectors.parts[PartId].detectors));
                         Object.values(Detectors).filter(detector => {
                             if (detector.data_icon == 'detector2'){
                                 return true;
@@ -1126,7 +1126,7 @@ class RiscoPanelSession {
                         })
                         .forEach(detector => {
                             if (detector.bypassed == false){
-                                if (self.DiscoveredAccessories.Detectors[detector.id].accessorytype != "Detector" ){
+                                if (self.DiscoveredAccessories.Detectors[detector.id].accessorytype != 'Detector' ){
                                     PReadyState = false;
                                 }
                                 ReadyState = false;
@@ -1155,7 +1155,7 @@ class RiscoPanelSession {
                 if (body.detectors != null) {
                     for (var PartId in body.detectors.parts) {
                         const Id = body.detectors.parts[PartId].id;
-                        const Detectors = JSON.parse(JSON.stringify(body.detectors.parts[Id].detectors));
+                        const Detectors = JSON.parse(JSON.stringify(body.detectors.parts[PartId].detectors));
                         var ReadyState = true;
                         var PReadyState = true;
 
@@ -1174,7 +1174,7 @@ class RiscoPanelSession {
                         })
                         .forEach(detector => {
                             if (detector.bypassed == false){
-                                if (self.DiscoveredAccessories.Detectors[detector.id].accessorytype != "Detector" ){
+                                if (self.DiscoveredAccessories.Detectors[detector.id].accessorytype != 'Detector' ){
                                     PReadyState = false;
                                 }
                                 ReadyState = false;
@@ -1198,11 +1198,11 @@ class RiscoPanelSession {
                 })());
             }
             self.log.debug('Leaving getPartStates function');
-            return Promise.resolve();
+            return Promise.resolve(true);
         } catch (err) {
             self.log.debug('Leaving getPartStates function');
             self.log.error('Error on Get Partitions States: %s', err);
-            return Promise.reject();
+            return Promise.reject(err);
         }
     }
 
@@ -1331,7 +1331,7 @@ class RiscoPanelSession {
                     self.log.debug('KeepAlive report a change. Using its result for status update.');
                     body = KA_rslt;
                 }
-                self.UpdateCPStates(body);
+                await self.UpdateCPStates(body);
                 self.log.debug('Leaving getCPStates function');
             } else {
                 self.log.debug('RiscoPanelSession is Not Ready');
