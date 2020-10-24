@@ -57,7 +57,7 @@ class RiscoPanelPlatform {
             return;
         }
 
-        this.RiscoPanel = new risco.RiscoPanelSession(this.config, this.log);
+        this.RiscoPanel = new risco.RiscoPanelSession(this.config, this.log, this.api);
 
         this.log.info('RiscoPanelPlatform finished initializing!');
 
@@ -114,8 +114,10 @@ class RiscoPanelPlatform {
     configureAccessory(accessory) {
         var self = this;
         this.hasCachedAccessory = true;
-        accessory.on("identify", () => {
+        accessory.on('identify', function accidentify() {
             this.log.debug('%s identified!', accessory.displayName);
+            //avoid warning on maxEventListener
+            this.removeListener('identify', accidentify);
         });
         if(this.DiscoveryFinished) {
             var KeepAccessory = false;
@@ -158,6 +160,7 @@ class RiscoPanelPlatform {
             accessory.removeService(accessory.getService(this.Custom_Types_Services[type]));
             accessory.context.accessorytype = type = object.context.accessorytype;
         }
+
         if(add) {
             this.log.debug('AddOrConfigure Accessory: %s', object.context.name);
             accessory.getService(Service.AccessoryInformation)
@@ -165,6 +168,13 @@ class RiscoPanelPlatform {
                 .setCharacteristic(Characteristic.Identify, object.context.name)
                 .setCharacteristic(Characteristic.Manufacturer, Manufacturer)
                 .setCharacteristic(Characteristic.Model, object.context.longName)
+                .setCharacteristic(Characteristic.SerialNumber, pjson.version)
+                .setCharacteristic(Characteristic.FirmwareRevision, pjson.version);
+        }
+
+        if ((accessory.getService(Service.AccessoryInformation).getCharacteristic(Characteristic.SerialNumber).value) != pjson.version) {
+            //do some stuff on update accessory from older version of plugin
+            accessory.getService(Service.AccessoryInformation)
                 .setCharacteristic(Characteristic.SerialNumber, pjson.version)
                 .setCharacteristic(Characteristic.FirmwareRevision, pjson.version);
         }

@@ -8,7 +8,7 @@ function extractError(aBody) {
 }
 
 class RiscoPanelSession {
-    constructor(aConfig, aLog) {
+    constructor(aConfig, aLog, api) {
         // Do not create new object if already exist
         // Avoid multiple Session to RiscoCloud
         if (!(this instanceof RiscoPanelSession)) {
@@ -23,11 +23,15 @@ class RiscoPanelSession {
         this.risco_password = encodeURIComponent(aConfig['riscoPassword']);
         this.risco_siteId = aConfig['riscoSiteId'];
         this.risco_pincode = aConfig['riscoPIN'];
+        this.Custom_Cmd = false;
+        this.api = api;
+        var self = this;
         this.Custom_armCommand = (function(){
                                     const regtest = RegExp('\\d:.*');
                                     if (regtest.test(aConfig['armCommand'])) {
                                         return 'armed';
                                     } else {
+                                        self.Custom_Cmd = true;
                                         return aConfig['armCommand'];
                                     }
                                 })() || 'armed';
@@ -36,6 +40,7 @@ class RiscoPanelSession {
                                     if (regtest.test(aConfig['nightCommand'])) {
                                         return 'partially';
                                     } else {
+                                        self.Custom_Cmd = true;
                                         return aConfig['nightCommand'];
                                     }
                                 })() || 'partially';
@@ -44,6 +49,7 @@ class RiscoPanelSession {
                                     if (regtest.test(aConfig['homeCommand'])) {
                                         return 'partially';
                                     } else {
+                                        self.Custom_Cmd = true;
                                         return aConfig['homeCommand'];
                                     }
                                 })() || 'partially';
@@ -52,6 +58,7 @@ class RiscoPanelSession {
                                     if (regtest.test(aConfig['disarmCommand'])) {
                                         return 'partially';
                                     } else {
+                                        self.Custom_Cmd = true;
                                         return aConfig['disarmCommand'];
                                     }
                                 })() || 'disarmed';
@@ -75,20 +82,19 @@ class RiscoPanelSession {
         // set up polling if requested
         if (self.polling) {
             self.log.info('Starting polling with an interval of %s ms', self.pollInterval);
-            self.log.info('armcommand after : %s' , self.Custom_armCommand);
             var emitter = new pollingtoevent(function (done) {
                 if ((self.Ready === true) && (self.SessionLogged)) {
-                    self.getCPStates(function (err, result) {
+                    self.getCPStatesPoll(function (err, result) {
                         done(err, result);
                     });
                 } else {
                     done(null, null);
                 }
             }, {
-                    longpollEventName: self.long_event_name,
-                    longpolling: true,
-                    interval: self.pollInterval
-                });
+                longpollEventName: self.long_event_name,
+                longpolling: true,
+                interval: self.pollInterval
+            });
 
             emitter.on(self.long_event_name, function (state) {
                 if (state) {
@@ -103,7 +109,9 @@ class RiscoPanelSession {
                 self.log.error('Polling failed, error was %s', err);
             });
 
-            emitter.on('close', function () {
+            self.api.on('shutdown', () => {
+                self.log.info('Shutdown detected, cleaning unused ressources');
+                self.log.debug('Remove All Listeners for %s', self.risco_panel_name);
                 emitter.removeAllListeners();
             });
         }
@@ -180,11 +188,11 @@ class RiscoPanelSession {
                     },
                     maxRedirects: 0,
                 })
-                .catch(function (error) {
+                .catch(error => {
                     if (error.response){
-                        throw new Error(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
+                        return Promise.reject(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
                     } else {
-                        throw new Error(`Error on Request : ${error.errno}\n Code : ${error.code}`);
+                        return Promise.reject(`Error on Request : ${error.errno}\n Code : ${error.code}`);
                     }
                 });
                 
@@ -212,11 +220,11 @@ class RiscoPanelSession {
                         },
                         maxRedirects: 0,                        
                     })
-                    .catch(function (error) {
+                    .catch(error => {
                         if (error.response){
-                            throw new Error(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
+                            return Promise.reject(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
                         } else {
-                            throw new Error(`Error on Request : ${error.errno}\n Code : ${error.code}`);
+                            return Promise.reject(`Error on Request : ${error.errno}\n Code : ${error.code}`);
                         }
                     });
 
@@ -263,11 +271,11 @@ class RiscoPanelSession {
                     },
                     maxRedirects: 0,
                 })
-                .catch(function (error) {
+                .catch(error => {
                     if (error.response){
-                        throw new Error(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
+                        return Promise.reject(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
                     } else {
-                        throw new Error(`Error on Request : ${error.errno}\n Code : ${error.code}`);
+                        return Promise.reject(`Error on Request : ${error.errno}\n Code : ${error.code}`);
                     }
                 });
 
@@ -287,11 +295,11 @@ class RiscoPanelSession {
                         },
                         maxRedirects: 0,
                     })
-                    .catch(function (error) {
+                    .catch(error => {
                         if (error.response){
-                            throw new Error(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
+                            return Promise.reject(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
                         } else {
-                            throw new Error(`Error on Request : ${error.errno}\n Code : ${error.code}`);
+                            return Promise.reject(`Error on Request : ${error.errno}\n Code : ${error.code}`);
                         }
                     });
 
@@ -339,11 +347,12 @@ class RiscoPanelSession {
                     },
                     maxRedirects: 0,
                 })
-                .catch(function (error) {
+                .catch(error => {
                     if (error.response){
-                        throw new Error(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
+                        return Promise.reject(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
                     } else {
-                        throw new Error(`Error on Request : ${error.errno}\n Code : ${error.code}`);
+                        //throw new Error(`Error on Request : ${error.errno}\n Code : ${error.code}`);
+                        return Promise.reject(`Error on Request : ${error.errno}`);
                     }
                 });
             } while (self.IsValidResponse(response, 'IsUserCodeExpired') == false)
@@ -384,11 +393,11 @@ class RiscoPanelSession {
                     },
                     maxRedirects: 0,
                 })
-                .catch(function (error) {
+                .catch(error => {
                     if (error.response){
-                        throw new Error(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
+                        return Promise.reject(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
                     } else {
-                        throw new Error(`Error on Request : ${error.errno}\n Code : ${error.code}`);
+                        return Promise.reject(`1Error on Request : ${error.errno}\n Code : ${error.code}`);
                     }
                 });
             } while (self.IsValidResponse(response, 'ValidateUserCode') == false)
@@ -444,11 +453,11 @@ class RiscoPanelSession {
                             },
                             maxRedirects: 0,
                         })
-                        .catch(function (error) {
+                        .catch(error => {
                             if (error.response){
-                                throw new Error(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
+                                return Promise.reject(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
                             } else {
-                                throw new Error(`Error on Request : ${error.errno}\n Code : ${error.code}`);
+                                return Promise.reject(`Error on Request : ${error.errno}\n Code : ${error.code}`);
                             }
                         });
                     } while (self.IsValidResponse(response, 'KeepAlive') == false)
@@ -514,11 +523,11 @@ class RiscoPanelSession {
                     },
                     maxRedirects: 0,
                 })
-                .catch(function (error) {
+                .catch(error => {
                     if (error.response){
-                        throw new Error(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
+                        return Promise.reject(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
                     } else {
-                        throw new Error(`Error on Request : ${error.errno}\n Code : ${error.code}`);
+                        return Promise.reject(`Error on Request : ${error.errno}\n Code : ${error.code}`);
                     }
                 });
             } while (self.IsValidResponse(response, 'DiscoverParts') == false)
@@ -552,6 +561,7 @@ class RiscoPanelSession {
                         homeCommand: this.Custom_homeCommand,
                         disarmCommand: this.Custom_disarmCommand,
                         Ready: true,
+                        PReady: true,
                         OnAlarm: false
                     };
                     Parts_Datas[0] = Part_Data;
@@ -631,11 +641,11 @@ class RiscoPanelSession {
                     },
                     maxRedirects: 0,
                 })
-                .catch(function (error) {
+                .catch(error => {
                     if (error.response){
-                        throw new Error(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
+                        return Promise.reject(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
                     } else {
-                        throw new Error(`Error on Request : ${error.errno}\n Code : ${error.code}`);
+                        return Promise.reject(`Error on Request : ${error.errno}\n Code : ${error.code}`);
                     }
                 });
             } while (self.IsValidResponse(response, 'DiscoverGroups', false) == false)
@@ -741,11 +751,11 @@ class RiscoPanelSession {
                     },
                     maxRedirects: 0,
                 })
-                .catch(function (error) {
+                .catch(error => {
                     if (error.response){
-                        throw new Error(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
+                        return Promise.reject(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
                     } else {
-                        throw new Error(`Error on Request : ${error.errno}\n Code : ${error.code}`);
+                        return Promise.reject(`Error on Request : ${error.errno}\n Code : ${error.code}`);
                     }
                 }); 
             } while (self.IsValidResponse(response, 'DiscoverOutputs', false) == false)
@@ -847,11 +857,11 @@ class RiscoPanelSession {
                     },
                     maxRedirects: 0,
                 })
-                .catch(function (error) {
+                .catch(error => {
                     if (error.response){
-                        throw new Error(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
+                        return Promise.reject(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
                     } else {
-                        throw new Error(`Error on Request : ${error.errno}\n Code : ${error.code}`);
+                        return Promise.reject(`Error on Request : ${error.errno}\n Code : ${error.code}`);
                     }
                 });
             } while (self.IsValidResponse(response, 'DiscoverDetectors') == false)
@@ -954,11 +964,11 @@ class RiscoPanelSession {
                     },
                     maxRedirects: 0,
                 })
-                .catch(function (error) {
+                .catch(error => {
                     if (error.response){
-                        throw new Error(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
+                       return Promise.reject(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
                     } else {
-                        throw new Error(`Error on Request : ${error.errno}\n Code : ${error.code}`);
+                        return Promise.reject(`Error on Request : ${error.errno}\n Code : ${error.code}`);
                     }
                 });
             } while (self.IsValidResponse(response, 'DiscoverCameras') == false)
@@ -1278,6 +1288,10 @@ class RiscoPanelSession {
         }
     }
 
+    async getCPStatesPoll() {
+        return await this.getCPStates();
+    }
+
     async getCPStates() {
         var self = this;
         self.log.debug('Entering getCPStates function');
@@ -1305,11 +1319,11 @@ class RiscoPanelSession {
                             },
                             maxRedirects: 0,
                         })
-                        .catch(function (error) {
+                        .catch(error => {
                             if (error.response){
-                                throw new Error(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
+                                return Promise.reject(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
                             } else {
-                                throw new Error(`Error on Request : ${error.errno}\n Code : ${error.code}`);
+                                return Promise.reject(`Error on Request : ${error.errno}\n Code : ${error.code}`);
                             }
                         });
                     } while (self.IsValidResponse(response, 'getCPStates') == false)
@@ -1412,11 +1426,11 @@ class RiscoPanelSession {
                     },
                     maxRedirects: 0,
                 })
-                .catch(function (error) {
+                .catch(error => {
                     if (error.response){
-                        throw new Error(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
+                        return Promise.reject(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
                     } else {
-                        throw new Error(`Error on Request : ${error.errno}\n Code : ${error.code}`);
+                        return Promise.reject(`Error on Request : ${error.errno}\n Code : ${error.code}`);
                     }
                 });
             } while (self.IsValidResponse(response, "armDisarm") == false)
@@ -1428,7 +1442,7 @@ class RiscoPanelSession {
                     //Todo :
                     // return more info
                     self.UpdateCPStates(response.data);
-                    return [0, NaN];
+                    return [0, [response.data.armFailures.errType, response.data.armFailures.text]];
                 } else {
                     if ((parseInt(response.data.ExitDelayTimeout) != 0)) {
                         self.log.debug('armDisarm Ok. Timed arming in progress');
@@ -1476,11 +1490,11 @@ class RiscoPanelSession {
                     },
                     maxRedirects: 0,
                 })
-                .catch(function (error) {
+                .catch(error => {
                     if (error.response){
-                        throw new Error(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
+                        return Promise.reject(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
                     } else {
-                        throw new Error(`Error on Request : ${error.errno}\n Code : ${error.code}`);
+                        return Promise.reject(`Error on Request : ${error.errno}\n Code : ${error.code}`);
                     }
                 });
             } while (self.IsValidResponse(response, 'HACommand') == false)
@@ -1530,11 +1544,11 @@ class RiscoPanelSession {
                     },
                     maxRedirects: 0,
                 })
-                .catch(function (error) {
+                .catch(error => {
                     if (error.response){
-                        throw new Error(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
+                        return Promise.reject(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
                     } else {
-                        throw new Error(`Error on Request : ${error.errno}\n Code : ${error.code}`);
+                        return Promise.reject(`Error on Request : ${error.errno}\n Code : ${error.code}`);
                     }
                 });
             } while (self.IsValidResponse(response, 'HACommand') == false)
