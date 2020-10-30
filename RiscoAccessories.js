@@ -14,11 +14,11 @@ class RiscoCPPartitions {
         this.pollInterval = accConfig.pollInterval || 30000;
         this.accessory = accessory;
         this.api = api;
+        this.Occupancy = accConfig.Occupancy || false;
         
         this.Service = this.api.hap.Service;
         this.Characteristic = this.api.hap.Characteristic;
         this.mainService = this.accessory.getService(this.Service.SecuritySystem, this.accessory.displayName);
-        this.OccupancyService = this.accessory.getService(this.Service.OccupancySensor, this.accessory.displayName);
 
         this.mainService
             .getCharacteristic(this.Characteristic.SecuritySystemCurrentState)
@@ -29,7 +29,8 @@ class RiscoCPPartitions {
             .on('get', this.getTargetState.bind(this))
             .on('set', this.setTargetState.bind(this));
 
-        if (this.TypeOfAcc == 'partition') {
+        if ((this.TypeOfAcc == 'partition') && (this.Occupancy)) {
+            this.OccupancyService = this.accessory.getService(this.Service.OccupancySensor, this.accessory.displayName);
             this.OccupancyService
                 .getCharacteristic(this.Characteristic.OccupancyDetected)
                 .on('get', this.getCurrentOccupancyState.bind(this));
@@ -63,7 +64,7 @@ class RiscoCPPartitions {
                 .getCharacteristic(this.Characteristic.SecuritySystemTargetState)
                 .removeListener('get', this.getTargetState)
                 .removeListener('set', this.setTargetState);
-            if (this.TypeOfAcc == 'partition') {
+            if ((this.TypeOfAcc == 'partition') && (this.Occupancy)) {
                 this.OccupancyService
                     .getCharacteristic(this.Characteristic.OccupancyDetected)
                     .removeListener('get', this.getCurrentOccupancyState);
@@ -122,7 +123,7 @@ class RiscoCPPartitions {
                     self.log.info('Partition "%s" => New state detected: (%s) -> %s. Notify!', self.name, state[0], self.translateState(state[0]));
                     self.mainService.updateCharacteristic(self.Characteristic.SecuritySystemCurrentState, state[0]);
                     self.riscoCurrentState = state[0];
-                    if (this.TypeOfAcc == 'partition') {
+                    if ((this.TypeOfAcc == 'partition') && (this.Occupancy)) {
                         self.log.info('Partition is %sOccupied. Notify!', self.name, ((state[1] == 0 ) ? 'not ' : ''));
                         self.OccupancyService.updateCharacteristic(self.Characteristic.OccupancyDetected, state[1]);
                         self.OccupancyState = state[1];
@@ -324,7 +325,7 @@ class RiscoCPPartitions {
                     .done(async function (result) {
                         await self.RiscoSession.getCPStates();
                         await self.getRefreshState(callback);
-                        if (self.TypeOfAcc == 'group'){
+                        if (self.TypeOfAcc == 'group') {
                             self.log.info('Partition "%s" => Actual state is: (%s) -> %s', self.name, self.riscoCurrentState, self.translateState(self.riscoCurrentState));
                         } else {
                             self.log.info('Group "%s" => Actual state is: (%s) -> %s',self.name, self.riscoCurrentState, self.translateState(self.riscoCurrentState));
@@ -357,11 +358,7 @@ class RiscoCPPartitions {
                     .done(async function (result) {
                         await self.RiscoSession.getCPStates();
                         await self.getRefreshState(callback);
-                        if (self.TypeOfAcc == 'group'){
-                            self.log.info('Group "%s" => Actual Occupancy state is: (%s) -> %s',self.name, self.OccupancyState, ((self.OccupancyState == 0) ? 'Not Occupied':'Occupied'));
-                        } else {
-                            self.log.info('Partition "%s" => Actual Occupancy state is: (%s) -> %s', self.name, self.OccupancyState, ((self.OccupancyState == 0) ? 'Not Occupied':'Occupied'));
-                        }
+                        self.log.info('Partition "%s" => Actual Occupancy state is: (%s) -> %s', self.name, self.OccupancyState, ((self.OccupancyState == 0) ? 'Not Occupied':'Occupied'));
                         self.OccupancyService.updateCharacteristic(self.Characteristic.OccupancyDetected, self.OccupancyState);
                         return;
                     });
@@ -417,7 +414,9 @@ class RiscoCPPartitions {
                 }
                 if (this.TypeOfAcc == 'partition') {
                     self.mainService.updateCharacteristic(self.Characteristic.SecuritySystemCurrentState, self.riscoCurrentState);
-                    self.OccupancyService.updateCharacteristic(self.Characteristic.OccupancyDetected, self.OccupancyState);
+                    if (this.Occupancy) {
+                        self.OccupancyService.updateCharacteristic(self.Characteristic.OccupancyDetected, self.OccupancyState);
+                    }
                     callback(null, [self.riscoCurrentState, self.OccupancyState]);
                 } else {
                     self.mainService.updateCharacteristic(self.Characteristic.SecuritySystemCurrentState, self.riscoCurrentState);

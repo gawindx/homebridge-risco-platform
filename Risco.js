@@ -1121,7 +1121,7 @@ class RiscoPanelSession {
                     self.DiscoveredAccessories.Partitions[0].OnAlarm = false;
                 }
                 //Determine Occupancy State
-                if (body.detectors != null) {
+                if ((body.detectors != null) && (self.DiscoveredAccessories.Detectors != undefined)) {
                     var ReadyState = true;
                     var PReadyState = true;
                     for (var PartId in body.detectors.parts) {
@@ -1161,7 +1161,7 @@ class RiscoPanelSession {
                         }
                     }
                 }
-                if (body.detectors != null) {
+                if ((body.detectors != null) && (self.DiscoveredAccessories.Detectors != undefined)) {
                     for (var PartId in body.detectors.parts) {
                         const Id = body.detectors.parts[PartId].id;
                         const Detectors = JSON.parse(JSON.stringify(body.detectors.parts[PartId].detectors));

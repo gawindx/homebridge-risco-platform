@@ -184,12 +184,21 @@ class RiscoPanelPlatform {
             case 'Partitions':
                 if (add) {
                     accessory.addService(Service.SecuritySystem, accessory.context.name);
-                    accessory.addService(Service.OccupancySensor, `Occupancy ${accessory.displayName}`, `occupancy_${accessory.context.name}`);
+                    if (object.Occupancy) {
+                        accessory.addService(Service.OccupancySensor, `Occupancy ${accessory.displayName}`, `occupancy_${accessory.context.name}`);
+                    }
                 } else {
                     this.log.info('Configuring accessory %s', accessory.displayName);
-                    if (accessory.getService(Service.OccupancySensor) == undefined ) {
-                        this.log.debug('Service Exclude not already defined on accessory %s', accessory.displayName);
-                        accessory.addService(Service.OccupancySensor, `Occupancy ${accessory.displayName}`, `occupancy_${accessory.context.name}`);
+                    if (object.Occupancy) {
+                        if (accessory.getService(Service.OccupancySensor) == undefined ){
+                            this.log.debug('Occupancy Service not already defined on accessory %s', accessory.displayName);
+                            accessory.addService(Service.OccupancySensor, `Occupancy ${accessory.displayName}`, `occupancy_${accessory.context.name}`);
+                        }
+                    } else {
+                        if (accessory.getService(Service.OccupancySensor) != undefined ){
+                            this.log.debug('Occupancy Service Defined but not needed on accessory %s', accessory.displayName);
+                            accessory.removeService(Service.OccupancySensor);
+                        }
                     }
                 }
                 new riscoAccessory.RiscoCPPartitions(this.log, object, this.api, accessory);
@@ -319,7 +328,8 @@ class RiscoPanelPlatform {
                         context: this.DiscoveredAccessories.Partitions[0],
                         RiscoSession: this.RiscoPanel,
                         polling: this.config['polling'],
-                        pollInterval: this.config['pollInterval']
+                        pollInterval: this.config['pollInterval'],
+                        Occupancy: ((this.DiscoveredAccessories.Detectors != undefined) ? true : false)
                     };
                     this.Devices.push(PartConfig);
                 } else {
@@ -331,7 +341,8 @@ class RiscoPanelPlatform {
                                     context: this.DiscoveredAccessories.Partitions[PartsId],
                                     RiscoSession: this.RiscoPanel,
                                     polling: this.config['polling'],
-                                    pollInterval: this.config['pollInterval']
+                                    pollInterval: this.config['pollInterval'],
+                                    Occupancy: ((this.DiscoveredAccessories.Detectors != undefined) ? true : false)
                                 };
                                 this.Devices.push(PartConfig);
                             }
