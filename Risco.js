@@ -26,7 +26,7 @@ class RiscoPanelSession {
         this.Custom_Cmd = false;
         this.api = api;
         var self = this;
-        this.Custom_armCommand = (function(){
+        this.Custom_armCommand = ( () => {
                                     const regtest = RegExp('\\d:.*');
                                     if (regtest.test(aConfig['armCommand'])) {
                                         return 'armed';
@@ -34,8 +34,8 @@ class RiscoPanelSession {
                                         self.Custom_Cmd = true;
                                         return aConfig['armCommand'];
                                     }
-                                })() || 'armed';
-        this.Custom_nightCommand = (function(){
+                                }) || 'armed';
+        this.Custom_nightCommand = ( () => {
                                     const regtest = RegExp('\\d:.*');
                                     if (regtest.test(aConfig['nightCommand'])) {
                                         return 'partially';
@@ -43,8 +43,8 @@ class RiscoPanelSession {
                                         self.Custom_Cmd = true;
                                         return aConfig['nightCommand'];
                                     }
-                                })() || 'partially';
-        this.Custom_homeCommand = (function(){
+                                }) || 'partially';
+        this.Custom_homeCommand = ( () => {
                                     const regtest = RegExp('\\d:.*');
                                     if (regtest.test(aConfig['homeCommand'])) {
                                         return 'partially';
@@ -52,8 +52,8 @@ class RiscoPanelSession {
                                         self.Custom_Cmd = true;
                                         return aConfig['homeCommand'];
                                     }
-                                })() || 'partially';
-        this.Custom_disarmCommand = (function(){
+                                }) || 'partially';
+        this.Custom_disarmCommand = ( () => {
                                     const regtest = RegExp('\\d:.*');
                                     if (regtest.test(aConfig['disarmCommand'])) {
                                         return 'partially';
@@ -61,7 +61,7 @@ class RiscoPanelSession {
                                         self.Custom_Cmd = true;
                                         return aConfig['disarmCommand'];
                                     }
-                                })() || 'disarmed';
+                                }) || 'disarmed';
         this.Partition = aConfig['Partition'];
         this.Groups = aConfig['Groups'];
         this.Outputs = aConfig['Outputs'];
@@ -82,9 +82,9 @@ class RiscoPanelSession {
         // set up polling if requested
         if (self.polling) {
             self.log.info('Starting polling with an interval of %s ms', self.pollInterval);
-            var emitter = new pollingtoevent(function (done) {
+            var emitter = new pollingtoevent( (done) => {
                 if ((self.Ready === true) && (self.SessionLogged)) {
-                    self.getCPStatesPoll(function (err, result) {
+                    self.getCPStatesPoll( (err, result) => {
                         done(err, result);
                     });
                 } else {
@@ -96,7 +96,7 @@ class RiscoPanelSession {
                 interval: self.pollInterval
             });
 
-            emitter.on(self.long_event_name, function (state) {
+            emitter.on(self.long_event_name, (state) => {
                 if (state) {
                     // Get OnceMore time Current State:
                     self.log.info('New state detected: (%s) -> %s. Notify!', state, translateState(state));
@@ -105,7 +105,7 @@ class RiscoPanelSession {
                 }
             });
 
-            emitter.on('err', function (err) {
+            emitter.on('err', (err) => {
                 self.log.error('Polling failed, error was %s', err);
             });
 
@@ -124,12 +124,12 @@ class RiscoPanelSession {
     async IsValidResponse(response, functionName, htmltest = true){
         var self = this;
         try {
-            if (htmltest == true){
+            if (htmltest == true) {
                 if (response.data.error != 0){
                     self.log.debug('Got Invalid RiscoCloud\'s Response from %s. Retry...', functionName);
                     self.log.debug('Bad response:\n%s', JSON.stringify(response.data));
                     ++self.BadResponseCounter;
-                    if (self.BadResponseCounter >= 5){
+                    if (self.BadResponseCounter >= 5) {
                         self.SessionLogged = false;
                         await self.login();
                         self.BadResponseCounter = 0;
@@ -139,11 +139,11 @@ class RiscoPanelSession {
                 } else {
                     self.BadResponseCounter = 0;
                     self.log.debug('Got Valid RiscoCloud\'s Response from %s. Continue...', functionName);
-                    self.log.debug('Good Response:\n%s', JSON.stringify(response.data));
+                    self.log.debug('Valid Response:\n%s', JSON.stringify(response.data));
                     return true;
                 }
             } else {
-                if (response.status == 302){
+                if (response.status == 302) {
                     self.log.debug('Got Invalid RiscoCloud\'s Response from %s. Retry...', functionName);
                     self.log.debug('Bad response:\n%s', response.status);
                     ++self.BadResponseCounter;
@@ -171,7 +171,7 @@ class RiscoPanelSession {
         var self = this;
         self.log.debug('Entering Login Function');
         try{
-            if (!self.SessionLogged){
+            if (!self.SessionLogged) {
 
                 const post_data = `username=${self.risco_username}&password=${self.risco_password}`;
                 const resp_s1 = await axios({
@@ -188,7 +188,7 @@ class RiscoPanelSession {
                     },
                     maxRedirects: 0,
                 })
-                .catch(error => {
+                .catch( error => {
                     if (error.response){
                         return Promise.reject(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
                     } else {
@@ -220,8 +220,8 @@ class RiscoPanelSession {
                         },
                         maxRedirects: 0,                        
                     })
-                    .catch(error => {
-                        if (error.response){
+                    .catch( error => {
+                        if (error.response) {
                             return Promise.reject(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
                         } else {
                             return Promise.reject(`Error on Request : ${error.errno}\n Code : ${error.code}`);
@@ -271,15 +271,15 @@ class RiscoPanelSession {
                     },
                     maxRedirects: 0,
                 })
-                .catch(error => {
-                    if (error.response){
+                .catch( error => {
+                    if (error.response) {
                         return Promise.reject(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
                     } else {
                         return Promise.reject(`Error on Request : ${error.errno}\n Code : ${error.code}`);
                     }
                 });
 
-                if (resp_s1.status == 302){
+                if (resp_s1.status == 302) {
                     const resp_s2 = await axios({
                         url: 'https://www.riscocloud.com/ELAS/WebUI/UserLogin/LogoutUser',
                         method: 'GET',
@@ -295,7 +295,7 @@ class RiscoPanelSession {
                         },
                         maxRedirects: 0,
                     })
-                    .catch(error => {
+                    .catch( error => {
                         if (error.response){
                             return Promise.reject(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
                         } else {
@@ -326,11 +326,11 @@ class RiscoPanelSession {
         }
     }
 
-    async IsUserCodeExpired(){
+    async IsUserCodeExpired() {
         var self = this;
         self.log.debug('Check User Code expiration');
         try {
-            var response
+            var response;
             do {
                 response = await axios({
                     url: 'https://www.riscocloud.com/ELAS/WebUI/SystemSettings/IsUserCodeExpired',
@@ -347,7 +347,7 @@ class RiscoPanelSession {
                     },
                     maxRedirects: 0,
                 })
-                .catch(error => {
+                .catch( error => {
                     if (error.response){
                         return Promise.reject(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
                     } else {
@@ -355,10 +355,10 @@ class RiscoPanelSession {
                         return Promise.reject(`Error on Request : ${error.errno}`);
                     }
                 });
-            } while (self.IsValidResponse(response, 'IsUserCodeExpired') == false)
+            } while (self.IsValidResponse(response, 'IsUserCodeExpired') == false);
 
             if (response.status == 200) {
-                self.log.debug('User Code Expired ? %s', response.data.pinExpired );
+                self.log.debug('User Code Expired ? %s', response.data.pinExpired);
                 return response.data.pinExpired;
             } else {
                 throw new Error(`Bad HTTP Response: ${response.status}`);
@@ -393,14 +393,14 @@ class RiscoPanelSession {
                     },
                     maxRedirects: 0,
                 })
-                .catch(error => {
+                .catch( error => {
                     if (error.response){
                         return Promise.reject(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
                     } else {
                         return Promise.reject(`1Error on Request : ${error.errno}\n Code : ${error.code}`);
                     }
                 });
-            } while (self.IsValidResponse(response, 'ValidateUserCode') == false)
+            } while (self.IsValidResponse(response, 'ValidateUserCode') == false);
 
             if (response.status == 200) {
                 if (response.data.error == 14) {
@@ -421,8 +421,8 @@ class RiscoPanelSession {
     async KeepAlive() {
         var self = this;
         self.log.debug('Entering KeepAlive Function');
-        try{
-            if (!self.SessionLogged){
+        try {
+            if (!self.SessionLogged) {
                 self.log.debug('Not Logged. Need to ReLogin');
                 await self.login();
                 return null;
@@ -460,9 +460,9 @@ class RiscoPanelSession {
                                 return Promise.reject(`Error on Request : ${error.errno}\n Code : ${error.code}`);
                             }
                         });
-                    } while (self.IsValidResponse(response, 'KeepAlive') == false)
+                    } while (self.IsValidResponse(response, 'KeepAlive') == false);
 
-                    if ( (response.headers['Location'] == '/ELAS/WebUI/UserLogin/SessionExpired') || (response.data.error == 3)) {
+                    if ((response.headers['Location'] == '/ELAS/WebUI/UserLogin/SessionExpired') || (response.data.error == 3)) {
                         self.SessionLogged = false;
                         self.log.info('Session Expired. ReLogin');
                         await self.login();
@@ -470,7 +470,7 @@ class RiscoPanelSession {
                         self.log.debug(response);
                         throw new Error('KeepAlive Bad HTTP Response: {response.status}');
                     }
-                    if ((response.data.overview !== null) || (response.data.detectors !== null)){
+                    if ((response.data.overview !== null) || (response.data.detectors !== null)) {
                         self.log.debug('Status change since the last scan. Manual update of the values.');
                         return response.data;
                     } else {
@@ -495,17 +495,16 @@ class RiscoPanelSession {
             await self.KeepAlive();
 
             var risco_Part_API_url;
+            var response;
+            const post_data = {};
 
-            if (self.Partition == 'system'){
+            if (self.Partition == 'system') {
                 self.log.debug('Partition Mode Off');
                 risco_Part_API_url = 'https://www.riscocloud.com/ELAS/WebUI/Overview/Get';
             } else {
                 self.log.debug('Partition Mode On');
                 risco_Part_API_url = 'https://www.riscocloud.com/ELAS/WebUI/Detectors/Get'
             }
-
-            var response;
-            const post_data = {};
 
             do {
                 response = await axios({
@@ -523,14 +522,14 @@ class RiscoPanelSession {
                     },
                     maxRedirects: 0,
                 })
-                .catch(error => {
+                .catch( error => {
                     if (error.response){
                         return Promise.reject(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
                     } else {
                         return Promise.reject(`Error on Request : ${error.errno}\n Code : ${error.code}`);
                     }
                 });
-            } while (self.IsValidResponse(response, 'DiscoverParts') == false)
+            } while (self.IsValidResponse(response, 'DiscoverParts') == false);
 
             if (response.status == 200) {
 
@@ -545,7 +544,7 @@ class RiscoPanelSession {
                         Required: 'system',
                         accessorytype: 'System',
                         previousState: null,
-                        actualState: (function(){
+                        actualState: ( () => {
                             var armedZones = body.overview.partInfo.armedStr.split(' ');
                             var partArmedZones = body.overview.partInfo.partarmedStr.split(' ');
                             if (parseInt(armedZones[0]) > 0) {
@@ -555,7 +554,7 @@ class RiscoPanelSession {
                             } else {
                                 return 'disarmed';
                             }    
-                        })(),
+                        }),
                         armCommand: this.Custom_armCommand,
                         nightCommand: this.Custom_nightCommand,
                         homeCommand: this.Custom_homeCommand,
@@ -589,10 +588,10 @@ class RiscoPanelSession {
                         if (self.Partition == 'all') {
                             self.log.debug('All Partitions Required');
                             Part_Data.Required = true;
-                        } else if (self.Partition != (self.Partition.split(',')) || ( parseInt(self.Partition) != NaN )){
+                        } else if (self.Partition != (self.Partition.split(',')) || (parseInt(self.Partition) != NaN)){
                             self.log.debug('Not All Partitions Required');
                             //Automatically convert string value to integer
-                            const Required_Zones = self.Partition.split(',').map(function(item) {
+                            const Required_Zones = self.Partition.split(',').map( (item) => {
                                 return parseInt(item, 10);
                             });
                             if (Required_Zones.includes(Part_Data.Id) !== false){
@@ -641,18 +640,18 @@ class RiscoPanelSession {
                     },
                     maxRedirects: 0,
                 })
-                .catch(error => {
+                .catch( error => {
                     if (error.response){
                         return Promise.reject(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
                     } else {
                         return Promise.reject(`Error on Request : ${error.errno}\n Code : ${error.code}`);
                     }
                 });
-            } while (self.IsValidResponse(response, 'DiscoverGroups', false) == false)
+            } while (self.IsValidResponse(response, 'DiscoverGroups', false) == false);
 
-            if (response.status == 200){
+            if (response.status == 200) {
                 self.log.debug('Groups Status: %s', response.status);
-                var GroupInfo = (function() { 
+                var GroupInfo = ( () => { 
                     var GroupInfo_begin = response.data.indexOf('<label for="actGrpItem');
                     self.log.debug('Groups => HTML Output Info start at: %s', GroupInfo_begin);
                     var GroupInfo_end = response.data.indexOf('</section>', GroupInfo_begin);
@@ -671,20 +670,20 @@ class RiscoPanelSession {
                             Id: GroupId,
                             name: Gname,
                             longName: `group_${GroupId}_${(Gname.toLowerCase()).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ /g, '_')}`,
-                            parentPart: (function(){
+                            parentPart: ( () => {
                                 var resultArray = [];
                                 for (var ParentPart in ParentPartList) {
                                     var ParentPartId = ParentPartList[ParentPart].match(new RegExp('<label data-groups=".*?' + GroupName + '.*?">.*<.*OpenPartGroups\\("(\\d*?)"','gm'));
-                                    if (ParentPartId != null ){
+                                    if (ParentPartId != null ) {
                                         resultArray.push((''+ParentPartId).match(/"(\d*?)"$/s)[1]);
                                     }
                                 }
                                 return resultArray;
-                            })(),
+                            }),
                             Required: null,
                             accessorytype: 'Groups',
                             previousState: null,
-                            actualState: (function() {
+                            actualState: ( () => {
                                 var result_State = 'Disarmed';
                                     var Group_Status = Groups_list[Group].match(/<span.*?area\s.*?">.*?input.*?"radio"\s.*?\s?name=.*?>/gs);
                                     for (var Status in Group_Status){
@@ -694,20 +693,20 @@ class RiscoPanelSession {
                                         }
                                     }
                                     return result_State;
-                                })(),
+                                }),
                             OnAlarm: false
                         };
                         self.log.debug('Discovering Group : "%s" with Id: %s', Group_Data.name, Group_Data.Id);
                         if (self.Groups == 'all') {
                             self.log.debug('All Groups Required');
                             Group_Data.Required = true;
-                        } else if (self.Groups != (self.Groups.split(',')) || ( parseInt(self.Groups) != NaN )){
+                        } else if (self.Groups != (self.Groups.split(',')) || (parseInt(self.Groups) != NaN)){
                             self.log.debug('Not All Groups Required');
                             //Automatically convert string value to integer
-                            const Required_Groups = self.Groups.split(',').map(function(item) {
+                            const Required_Groups = self.Groups.split(',').map( (item) => {
                                 return parseInt(item, 10);
                             });
-                            if (Required_Groups.includes(Group_Data.Id) !== false){
+                            if (Required_Groups.includes(Group_Data.Id) !== false) {
                                 self.log.debug('Group "%s" Required', Group_Data.name);
                                 Group_Data.Required = true;
                             } else {
@@ -715,12 +714,11 @@ class RiscoPanelSession {
                                 Group_Data.Required = false;
                             }
                         }
-
                         Groups_Datas[Group_Data.Id] = Group_Data;
                     }
                     self.log.debug(JSON.stringify(Groups_Datas));
                     return Groups_Datas;
-                })();
+                });
                 return GroupInfo;
             } else {
                 throw new Error(`Bad HTTP Response: ${response.status}`);
@@ -751,17 +749,17 @@ class RiscoPanelSession {
                     },
                     maxRedirects: 0,
                 })
-                .catch(error => {
-                    if (error.response){
+                .catch( error => {
+                    if (error.response) {
                         return Promise.reject(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
                     } else {
                         return Promise.reject(`Error on Request : ${error.errno}\n Code : ${error.code}`);
                     }
                 }); 
-            } while (self.IsValidResponse(response, 'DiscoverOutputs', false) == false)
+            } while (self.IsValidResponse(response, 'DiscoverOutputs', false) == false);
 
-            if (response.status == 200){
-                var OutputInfo = (function() { 
+            if (response.status == 200) {
+                var OutputInfo = ( () => {
                     var OutputInfo_begin = response.data.indexOf('<ul style="list-style:none; margin:0; padding:0;">');
                     self.log.debug('HTML Output Info start at: %s', OutputInfo_begin);
                     var OutputInfo_end = response.data.indexOf('</ul>', OutputInfo_begin);
@@ -780,32 +778,32 @@ class RiscoPanelSession {
                             longName: `out_${OutputId}_${(OutputName.toLowerCase()).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ /g, '_')}`,
                             Required: null,
                             accessorytype: 'Outputs',
-                            Type: (function() {
+                            Type: ( () => {
                                     if (Output_Cmd.match(/(\d)\)$/) == null) {
                                         return 'pulse';
                                     } else {
                                         return 'switch';
                                     }
-                                })(),
-                            State: (function(){ 
+                                }),
+                            State: ( () => {
                                     if (Output_Cmd.match(/(\d)\)$/) == null) {
                                         return false;
                                     } else {
                                        return ((Math.abs(parseInt(Output_Cmd.match(/(\d)\)$/)[1]) - 1)) ? true : false);
                                     }
-                                })()
+                                })
                         };
                         self.log.debug('Discovering Outputs : %s with Id : %s', Output_Data.name, Output_Data.Id);
                         if (self.Outputs == 'all') {
                             self.log.debug('All Outputs Required');
                             Output_Data.Required = true;
-                        } else if (self.Outputs != (self.Outputs.split(',')) || ( parseInt(self.Outputs) != NaN )){
+                        } else if (self.Outputs != (self.Outputs.split(',')) || (parseInt(self.Outputs) != NaN)){
                             self.log.debug('Not All Outputs Required');
                             //Automatically convert string value to integer
-                            const Required_Outputs = self.Outputs.split(',').map(function(item) {
+                            const Required_Outputs = self.Outputs.split(',').map( (item) => {
                                 return parseInt(item, 10);
                             });
-                            if (Required_Outputs.includes(Output_Data.Id) !== false){
+                            if (Required_Outputs.includes(Output_Data.Id) !== false) {
                                 self.log.debug('Outputs "%s" Required', Output_Data.name);
                                 Output_Data.Required = true;
                             } else {
@@ -825,7 +823,7 @@ class RiscoPanelSession {
                     }
                     self.log.debug(JSON.stringify(Outputs_Datas));
                     return Outputs_Datas;
-                })();
+                });
                 return OutputInfo;
             } else {
                 throw new Error(`Bad HTTP Response: ${response.status}`);
@@ -857,24 +855,24 @@ class RiscoPanelSession {
                     },
                     maxRedirects: 0,
                 })
-                .catch(error => {
+                .catch( error => {
                     if (error.response){
                         return Promise.reject(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
                     } else {
                         return Promise.reject(`Error on Request : ${error.errno}\n Code : ${error.code}`);
                     }
                 });
-            } while (self.IsValidResponse(response, 'DiscoverDetectors') == false)
+            } while (self.IsValidResponse(response, 'DiscoverDetectors') == false);
 
-            if (response.status == 200){
+            if (response.status == 200) {
                 self.log.debug('Detectors/Get status:\n%s', response.status);
-                var DetectorsInfos = (function() {
+                var DetectorsInfos = ( () => {
                     self.log.debug(JSON.stringify(response.data));
                     var Detectors_Datas = {};
-                    for (var Parts in response.data.detectors.parts){
-                        for (var Detector in response.data.detectors.parts[Parts].detectors){
+                    for (var Parts in response.data.detectors.parts) {
+                        for (var Detector in response.data.detectors.parts[Parts].detectors) {
                             self.log.debug(JSON.stringify(response.data.detectors.parts[Parts].detectors[Detector]));
-                            const DetectorName = (function() {
+                            const DetectorName = ( () => {
                                             var tmp_name = response.data.detectors.parts[Parts].detectors[Detector].name;
                                             return tmp_name.replace(/&#(\d+);/g, function(match, dec) {
                                                 return String.fromCharCode(dec);
@@ -889,15 +887,15 @@ class RiscoPanelSession {
                                 accessorytype: 'Detector',
                                 name: DetectorName,
                                 longName: `det_${DetectorId}_${(DetectorName.toLowerCase()).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ /g, '_')}`,
-                                State: (function() {
+                                State: ( () => {
                                             //'detector' for inactive
                                             //'detector2' for active
                                             //'detector5' for bypassed
                                             //'detector??' for tampered
-                                            if (response.data.detectors.parts[Parts].detectors[Detector].data_icon == 'detector'){
+                                            if (response.data.detectors.parts[Parts].detectors[Detector].data_icon == 'detector') {
                                                 return false;
                                             } else {
-                                                if (response.data.detectors.parts[Parts].detectors[Detector].data_icon == 'detector5'){
+                                                if (response.data.detectors.parts[Parts].detectors[Detector].data_icon == 'detector5') {
                                                     return false;
                                                 } else {
                                                     return true;
@@ -910,13 +908,13 @@ class RiscoPanelSession {
                             if (self.Detectors == 'all') {
                                 self.log.debug('All Detectors Required');
                                 Detector_Data.Required = true;
-                            } else if (self.Detectors != (self.Detectors.split(',')) || ( parseInt(self.Detectors) != NaN )){
+                            } else if (self.Detectors != (self.Detectors.split(',')) || (parseInt(self.Detectors) != NaN)) {
                                 self.log.debug('Not All Detectors Required');
                                 //Automatically convert string value to integer
-                                const Required_Detectors = self.Detectors.split(',').map(function(item) {
+                                const Required_Detectors = self.Detectors.split(',').map( (item) => {
                                     return parseInt(item, 10);
                                 });
-                                if (Required_Detectors.includes(Detector_Data.Id) !== false){
+                                if (Required_Detectors.includes(Detector_Data.Id) !== false) {
                                     self.log.debug('Detectors "%s" Required', Detector_Data.name);
                                     Detector_Data.Required = true;
                                 } else {
@@ -939,6 +937,7 @@ class RiscoPanelSession {
             }
         } catch (err) {
             self.log.error('Error on Discovery Detector:\n%s', err);
+            return {};
         }
     }
 
@@ -964,16 +963,16 @@ class RiscoPanelSession {
                     },
                     maxRedirects: 0,
                 })
-                .catch(error => {
-                    if (error.response){
+                .catch( error => {
+                    if (error.response) {
                        return Promise.reject(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
                     } else {
                         return Promise.reject(`Error on Request : ${error.errno}\n Code : ${error.code}`);
                     }
                 });
-            } while (self.IsValidResponse(response, 'DiscoverCameras') == false)
+            } while (self.IsValidResponse(response, 'DiscoverCameras') == false);
 
-            if (response.status == 200){
+            if (response.status == 200) {
                 self.log.debug('Cameras/Get status:\n%s',response.status);
                 var CamerasInfos = (function() {
                     self.log.debug(JSON.stringify(response.data));
@@ -1098,10 +1097,10 @@ class RiscoPanelSession {
         var self = this;
         self.log.debug('Entering getPartStates function');
         try {
-            if (self.DiscoveredAccessories.Partitions.type == 'system'){
+            if (self.DiscoveredAccessories.Partitions.type == 'system') {
                 self.log.debug('System Mode');
                 self.DiscoveredAccessories.Partitions[0].previousState = self.DiscoveredAccessories.Partitions[0].actualState;
-                self.DiscoveredAccessories.Partitions[0].actualState = (function(){
+                self.DiscoveredAccessories.Partitions[0].actualState = (function() {
                     var armedZones = body.overview.partInfo.armedStr.split(' ');
                     var partArmedZones = body.overview.partInfo.partarmedStr.split(' ');
                     if (parseInt(armedZones[0]) > 0) {
@@ -1114,11 +1113,11 @@ class RiscoPanelSession {
                 })();
                 self.log.debug('Previous State: %s', self.DiscoveredAccessories.Partitions[0].previousState);
                 self.log.debug('Actual State: %s', self.DiscoveredAccessories.Partitions[0].actualState);
-                if (Math.max(body.ExitDelayTimeout) != 0){
+                if (Math.max(body.ExitDelayTimeout) != 0) {
                     self.DiscoveredAccessories.Partitions[0].ExitDelay = Math.max(body.ExitDelayTimeout);
                     self.log.debug('Arming Delay Left: %s', self.DiscoveredAccessories.Partitions[0].ExitDelay);
                 }
-                if ((self.DiscoveredAccessories.Partitions[0].OnAlarm == true) && (self.DiscoveredAccessories.Partitions[0].actualState == 'disarmed')){
+                if ((self.DiscoveredAccessories.Partitions[0].OnAlarm == true) && (self.DiscoveredAccessories.Partitions[0].actualState == 'disarmed')) {
                     self.DiscoveredAccessories.Partitions[0].OnAlarm = false;
                 }
                 //Determine Occupancy State
@@ -1154,9 +1153,9 @@ class RiscoPanelSession {
                 }
             } else {
                 self.log.debug('Partition Mode');
-                if (Math.max(body.ExitDelayTimeout) != 0){
-                    for (var PartId in body.ExitDelayTimeout){
-                       if (body.ExitDelayTimeout[PartId] != 0){
+                if (Math.max(body.ExitDelayTimeout) != 0) {
+                    for (var PartId in body.ExitDelayTimeout) {
+                       if (body.ExitDelayTimeout[PartId] != 0) {
                             self.DiscoveredAccessories.Partitions[PartId].ExitDelay = body.ExitDelayTimeout[PartId];
                             self.log.debug('Arming Delay Left for Part "%s": %s', self.DiscoveredAccessories.Partitions[PartId].name, self.DiscoveredAccessories.Partitions[PartId].ExitDelay);
                         }
@@ -1176,15 +1175,15 @@ class RiscoPanelSession {
                         self.log.debug('Actual State: %s', self.DiscoveredAccessories.Partitions[Id].actualState);
                         //Determine Occupancy State
                         Object.values(Detectors).filter(detector => {
-                            if (detector.data_icon == 'detector2'){
+                            if (detector.data_icon == 'detector2') {
                                 return true;
                             } else {
                                 return false;
                             }
                         })
                         .forEach(detector => {
-                            if (detector.bypassed == false){
-                                if (self.DiscoveredAccessories.Detectors[detector.id].accessorytype != 'Detector' ){
+                            if (detector.bypassed == false) {
+                                if (self.DiscoveredAccessories.Detectors[detector.id].accessorytype != 'Detector' ) {
                                     PReadyState = false;
                                 }
                                 ReadyState = false;
@@ -1202,7 +1201,7 @@ class RiscoPanelSession {
                 }
                 var Partitions = JSON.parse(JSON.stringify(self.DiscoveredAccessories.Partitions));
                 Object.values(Partitions).filter(partition => ((partition.OnAlarm == true) && (partition.actualState == "disarmed")))
-                    .forEach(partition => (function(){
+                    .forEach(partition => (function() {
                         self.log.debug('Partition %s Reset OnAlarm State', partition.name);
                         self.DiscoveredAccessories.Partitions[partition.Id].OnAlarm = false;
                 })());
@@ -1223,7 +1222,7 @@ class RiscoPanelSession {
             for (var GroupId in body.allGrpState.GlobalState) {
                 const Id = body.allGrpState.GlobalState[GroupId].Id;
                 self.DiscoveredAccessories.Groups[Id].previousState = self.DiscoveredAccessories.Groups[Id].actualState;
-                self.DiscoveredAccessories.Groups[Id].actualState = (function(){
+                self.DiscoveredAccessories.Groups[Id].actualState = (function() {
                         self.log.debug('Group Armed State? ' + body.allGrpState.GlobalState[GroupId].Armed);
                         return ((body.allGrpState.GlobalState[GroupId].Armed != false)?'armed':'disarmed');
                     })();
@@ -1271,7 +1270,7 @@ class RiscoPanelSession {
                     const Id = body.detectors.parts[Parts].detectors[DetectorId].id;
                     self.DiscoveredAccessories.Detectors[Id].Bypassed = body.detectors.parts[Parts].detectors[DetectorId].bypassed;
                     self.DiscoveredAccessories.Detectors[Id].State = (function() {
-                        if (body.detectors.parts[Parts].detectors[DetectorId].data_icon == 'detector2'){
+                        if (body.detectors.parts[Parts].detectors[DetectorId].data_icon == 'detector2') {
                             return true;
                         } else {
                             return false;
@@ -1295,12 +1294,12 @@ class RiscoPanelSession {
     async getCPStates() {
         var self = this;
         self.log.debug('Entering getCPStates function');
-        try{
+        try {
             var body;
             const KA_rslt = await self.KeepAlive();
             if ( (self.Ready === true) && (self.SessionLogged)) {
                 self.log.debug('RiscoPanelSession is Ready');
-                if (KA_rslt === null){
+                if (KA_rslt === null) {
                     self.log.debug('KeepAlive does not signal a change or has not been tested.');
                     var response;
                     do {
@@ -1319,14 +1318,14 @@ class RiscoPanelSession {
                             },
                             maxRedirects: 0,
                         })
-                        .catch(error => {
+                        .catch( error => {
                             if (error.response){
                                 return Promise.reject(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
                             } else {
                                 return Promise.reject(`Error on Request : ${error.errno}\n Code : ${error.code}`);
                             }
                         });
-                    } while (self.IsValidResponse(response, 'getCPStates') == false)
+                    } while (self.IsValidResponse(response, 'getCPStates') == false);
 
                     if (response.status == 200) {
                         body = response.data;
@@ -1362,17 +1361,17 @@ class RiscoPanelSession {
     async UpdateCPStates(body) {
         var self = this;
         self.log.debug('Entering UpdateCPStates function');
-        try{
-            if (((this.Partition || 'none') != 'none') && ((body.detectors != null) || (Math.max(body.ExitDelayTimeout) != 0 ))) {
+        try {
+            if (((self.Partition || 'none') != 'none') && ((body.detectors != null) || (Math.max(body.ExitDelayTimeout) != 0 ))) {
                 await self.getPartsStates(body);
             }
-            if (((this.Groups || 'none') != 'none') && (body.allGrpState != null)) {
+            if (((self.Groups || 'none') != 'none') && (body.allGrpState != null)) {
                 await self.getGroupsStates(body);
             }
-            if (((this.Outputs || 'none') != 'none') && (body.haSwitch != null)) {
+            if (((self.Outputs || 'none') != 'none') && (body.haSwitch != null)) {
                 await self.getOutputsStates(body);
             }
-            if (((this.Detectors || 'none') != 'none') && (body.detectors != null)) {
+            if (((self.Detectors || 'none') != 'none') && (body.detectors != null)) {
                 await self.getDetectorsStates(body);
             }
             await self.getAlarmState(body);
@@ -1426,17 +1425,17 @@ class RiscoPanelSession {
                     },
                     maxRedirects: 0,
                 })
-                .catch(error => {
+                .catch( error => {
                     if (error.response){
                         return Promise.reject(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
                     } else {
                         return Promise.reject(`Error on Request : ${error.errno}\n Code : ${error.code}`);
                     }
                 });
-            } while (self.IsValidResponse(response, "armDisarm") == false)
+            } while (self.IsValidResponse(response, "armDisarm") == false);
 
-            if (response.status == 200){
-                if (response.data.armFailures !== null ){
+            if (response.status == 200) {
+                if (response.data.armFailures !== null ) {
                     self.log.debug('armDisarm Not Ok. Using this result for status update');
                     self.log.debug('errType: %s Reason: %s', response.data.armFailures.errType, response.data.armFailures.text);
                     //Todo :
@@ -1457,7 +1456,7 @@ class RiscoPanelSession {
             } else {
                 throw new Error(`Bad HTTP Response: ${response.status}`);
             }
-        }catch(err){
+        } catch (err) {
             self.log.error('Error on armDisarm function:\n%s', err);
             return [0, NaN];
         }
@@ -1490,18 +1489,18 @@ class RiscoPanelSession {
                     },
                     maxRedirects: 0,
                 })
-                .catch(error => {
+                .catch( error => {
                     if (error.response){
                         return Promise.reject(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
                     } else {
                         return Promise.reject(`Error on Request : ${error.errno}\n Code : ${error.code}`);
                     }
                 });
-            } while (self.IsValidResponse(response, 'HACommand') == false)
+            } while (self.IsValidResponse(response, 'HACommand') == false);
 
-            if (response.status == 200){
+            if (response.status == 200) {
                 //response for pulse switch ok : {error: 0, haSwitch: [], devId: 2}
-                if (response.data.error != 0){
+                if (response.data.error != 0) {
                     self.log.debug('HACommand Not Ok. Using this result for status update');
                     self.log.debug('errType:\n%s', JSON.stringify(response.data));
                     self.UpdateCPStates(response.data);
@@ -1514,7 +1513,7 @@ class RiscoPanelSession {
             } else {
                 throw new Error(`Bad HTTP Response: ${response.status}`);
             }
-        }catch(err){
+        } catch (err) {
             self.log.error('Error on HACommand function:\n%s', err);
             return false;
         }
@@ -1544,17 +1543,17 @@ class RiscoPanelSession {
                     },
                     maxRedirects: 0,
                 })
-                .catch(error => {
+                .catch( error => {
                     if (error.response){
                         return Promise.reject(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
                     } else {
                         return Promise.reject(`Error on Request : ${error.errno}\n Code : ${error.code}`);
                     }
                 });
-            } while (self.IsValidResponse(response, 'HACommand') == false)
+            } while (self.IsValidResponse(response, 'HACommand') == false);
 
-            if (response.status == 200){
-                if (response.data.error != 0){
+            if (response.status == 200) {
+                if (response.data.error != 0) {
                     self.log.debug('SetBypass Not Ok. Using this result for status update');
                     self.log.debug('errType:\n%s', JSON.stringify(response.data));
                     self.UpdateCPStates(response.data);

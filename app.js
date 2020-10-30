@@ -52,7 +52,7 @@ class RiscoPanelPlatform {
 
         if (!api || !config) return;
 
-        if(!config.riscoUsername || !config.riscoPassword || !config.riscoSiteId || !config.riscoPIN) {
+        if (!config.riscoUsername || !config.riscoPassword || !config.riscoSiteId || !config.riscoPIN) {
             this.log.error('Insufficient credentials in config.json!');
             return;
         }
@@ -76,26 +76,26 @@ class RiscoPanelPlatform {
                 await this.DiscoverAccessoriesFromRiscoCloud();
                 this.log.debug('Discovered Accessories:\n%s', JSON.stringify(this.DiscoveredAccessories));
                 this.log.info('PreConf Phase Started');
-                try{
+                try {
                     for (var DeviceFamily in this.DiscoveredAccessories) {
                         this.PreConfigureAccessories(DeviceFamily);
                     }
                     this.DiscoveryFinished = true;
-                } catch (err){
+                } catch (err) {
                     this.log.error('Error on PreConf Phase: ' + err);
                 }
                 this.log.debug('PreConfigured Accessories:\n%s', JSON.stringify(this.DiscoveredAccessories));
                 this.log.info('PreConf Phase Ended');
                 this.log.info('Create Accessory Phase Started');
                 this.log.debug('Devices:\n%s', JSON.stringify(this.Devices));
-                try{
-                    if(this.hasCachedAccessory){
+                try {
+                    if (this.hasCachedAccessory) {
                         await new Promise(r => setTimeout(r, 5000));
                     }
                     for (var DiscoveredAcc in this.Devices) {
                         this.addAccessory(this.Devices[DiscoveredAcc]);
                     }
-                } catch (err){
+                } catch (err) {
                     this.log.error('Error on Create Accessory Phase :\n%s' + err);
                 }
                 this.RiscoPanel.Ready = true;
@@ -103,7 +103,7 @@ class RiscoPanelPlatform {
 
                 //prune Unused accessories
                 for (const accessory of this.accessories) {
-                    if ((accessory.context.todelete !== undefined) && (accessory.context.todelete === true)){
+                    if ((accessory.context.todelete !== undefined) && (accessory.context.todelete === true)) {
                         this._removeAccessory(accessory);                        
                     }
                 }
@@ -117,17 +117,17 @@ class RiscoPanelPlatform {
         accessory.on('identify', function accidentify() {
             this.log.debug('%s identified!', accessory.displayName);
             //avoid warning on maxEventListener
-            this.removeListener('identify', accidentify);
+            accessory.removeListener('identify', accidentify);
         });
-        if(this.DiscoveryFinished) {
+        if (this.DiscoveryFinished) {
             var KeepAccessory = false;
             this.log.info('Restoring or Set Removing accessory %s', accessory.displayName);
             this.Devices.filter(new_device => (new_device.context.longName == accessory.context.longName) && (new_device.context.Required == true))
-                .map(new_device => (function () {
+                .map(new_device => {
                     self.log.debug('Device to reconfigure:\n%s',JSON.stringify(new_device));
                     self._addOrConfigure(accessory, new_device, accessory.context.accessorytype, false);
                     KeepAccessory = true;
-                })());
+                });
             this.accessories.push(accessory);
             this.api.updatePlatformAccessories([accessory]);
             if (!(KeepAccessory)) {
@@ -161,7 +161,7 @@ class RiscoPanelPlatform {
             accessory.context.accessorytype = type = object.context.accessorytype;
         }
 
-        if(add) {
+        if (add) {
             this.log.debug('AddOrConfigure Accessory: %s', object.context.name);
             accessory.getService(Service.AccessoryInformation)
                 .setCharacteristic(Characteristic.Name, object.context.name)
@@ -179,13 +179,13 @@ class RiscoPanelPlatform {
                 .setCharacteristic(Characteristic.FirmwareRevision, pjson.version);
         }
 
-        switch(type) {
+        switch (type) {
             case 'System':
             case 'Partitions':
-                if(add) {
+                if (add) {
                     accessory.addService(Service.SecuritySystem, accessory.context.name);
                     accessory.addService(Service.OccupancySensor, `Occupancy ${accessory.displayName}`, `occupancy_${accessory.context.name}`);
-                }else{
+                } else {
                     this.log.info('Configuring accessory %s', accessory.displayName);
                     if (accessory.getService(Service.OccupancySensor) == undefined ) {
                         this.log.debug('Service Exclude not already defined on accessory %s', accessory.displayName);
@@ -195,26 +195,26 @@ class RiscoPanelPlatform {
                 new riscoAccessory.RiscoCPPartitions(this.log, object, this.api, accessory);
                 break;
             case 'Groups':
-                if(add) {
+                if (add) {
                     accessory.addService(Service.SecuritySystem, accessory.context.name);
-                }else{
+                } else {
                     this.log.info('Configuring accessory %s_%s', accessory.displayName, type);
                 }
                 new riscoAccessory.RiscoCPGroups(this.log, object, this.api, accessory);
                 break;
             case 'Outputs':
-                if(add) {
+                if (add) {
                     accessory.addService(Service.Switch, accessory.context.name);
-                }else{
+                } else {
                     this.log.info('Configuring accessory %s_%s', accessory.displayName, type);
                 }
                 new riscoAccessory.RiscoCPOutputs(this.log, object, this.api, accessory);
                 break;
             default:
                 if (this.Custom_Types.includes(type)) {
-                    if(add) {
+                    if (add) {
                         this.log.info('Add or Modifying accessory %s', accessory.displayName);
-                        for (var AccTypes in this.Custom_Types_Services){
+                        for (var AccTypes in this.Custom_Types_Services) {
                             if ((AccTypes != type) && (accessory.getService(this.Custom_Types_Services[AccTypes]) != undefined)) {
                                 this.log.debug('Service %s already defined on accessory %s', AccTypes, accessory.displayName);
                                 this.log.debug('This service is not required anymore ; remove it');
@@ -229,7 +229,7 @@ class RiscoPanelPlatform {
                             this.log.debug('Service Exclude not already defined on accessory %s', accessory.displayName);
                             accessory.addService(Service.Switch, `Exclude ${accessory.displayName}`, `exclude_${accessory.context.name}`);
                         }
-                    }else{
+                    } else {
                         this.log.info('Configuring accessory %s',accessory.displayName);
                         if (accessory.getService(Service.Switch) == undefined ) {
                             this.log.debug('Service Exclude not already defined on accessory %s', accessory.displayName);
@@ -271,26 +271,26 @@ class RiscoPanelPlatform {
                 this.DiscoveredAccessories.Cameras = await this.RiscoPanel.DiscoverCameras();
             }
             //fallback to system mode if no DiscoveredAccessories
-            if (Object.keys(this.DiscoveredAccessories).length == 0 ){
+            if (Object.keys(this.DiscoveredAccessories).length == 0 ) {
                 this.log.debug('Fallback to system mode');
                 this.config['Partition'] = 'system';
                 this.DiscoveredAccessories.partitions = await this.RiscoPanel.DiscoverParts();   
             }
             if ((this.config['Custom'] || 'none') != 'none') {
                 this.log.info('Apply Custom Configuration');
-                for (var Custom_Type in this.Custom_Types){
+                for (var Custom_Type in this.Custom_Types) {
                     this.log('Modify Detectors to %s', this.Custom_Types[Custom_Type]);
                     if ((this.config['Custom'][this.Custom_Types[Custom_Type]] || 'none') != 'none') {
-                        if (this.config['Custom'][this.Custom_Types[Custom_Type]] == 'all'){
-                            for (var Detector in this.DiscoveredAccessories.Detectors){
+                        if (this.config['Custom'][this.Custom_Types[Custom_Type]] == 'all') {
+                            for (var Detector in this.DiscoveredAccessories.Detectors) {
                                 this.DiscoveredAccessories.Detectors[Detector].accessorytype = this.Custom_Types[Custom_Type];
                             }
-                        } else if (this.config['Custom'][this.Custom_Types[Custom_Type]] != (this.config['Custom'][this.Custom_Types[Custom_Type]].split(',')) || ( parseInt(this.config['Custom'][this.Custom_Types[Custom_Type]]) != NaN )){
+                        } else if (this.config['Custom'][this.Custom_Types[Custom_Type]] != (this.config['Custom'][this.Custom_Types[Custom_Type]].split(',')) || ( parseInt(this.config['Custom'][this.Custom_Types[Custom_Type]]) != NaN )) {
                             const Modified_Detectors = this.config['Custom'][this.Custom_Types[Custom_Type]].split(',').map(function(item) {
                                 return parseInt(item, 10);
                             });
                             this.log.debug('Modified Detectors:\n%s', JSON.stringify(Modified_Detectors));
-                            for (var Id_Detector in Modified_Detectors){
+                            for (var Id_Detector in Modified_Detectors) {
                                 this.log.debug('Detector Name/Id: %s/%s Modified to %s', this.DiscoveredAccessories.Detectors[Modified_Detectors[Id_Detector]].name, this.DiscoveredAccessories.Detectors[Modified_Detectors[Id_Detector]].Id, this.Custom_Types[Custom_Type]);
                                 this.DiscoveredAccessories.Detectors[Modified_Detectors[Id_Detector]].accessorytype = this.Custom_Types[Custom_Type];
                             }
@@ -301,7 +301,7 @@ class RiscoPanelPlatform {
             this.RiscoPanel.DiscoveredAccessories = this.DiscoveredAccessories;
             this.log.info('Discovering Phase Ended');
             return Promise.resolve();
-        } catch (err){
+        } catch (err) {
             this.log.error('Error on Discovery Phase:\n%s', err);
             this.RiscoPanel.DiscoveredAccessories = this.DiscoveredAccessories;
             this.log.info('Discovering Phase Ended');
@@ -313,7 +313,7 @@ class RiscoPanelPlatform {
         switch (DeviceFamily) {
             case 'Partitions':
                 this.log.info('PreConf Accessory => Add Partitions');
-                if ( this.DiscoveredAccessories.Partitions.type == 'system') {
+                if (this.DiscoveredAccessories.Partitions.type == 'system') {
                     this.log.info('PreConf Accessory => Configuration for System: %s', this.DiscoveredAccessories.Partitions[0].name);
                     var PartConfig = {
                         context: this.DiscoveredAccessories.Partitions[0],
@@ -324,7 +324,7 @@ class RiscoPanelPlatform {
                     this.Devices.push(PartConfig);
                 } else {
                     for (var PartsId in this.DiscoveredAccessories.Partitions) {
-                        if (PartsId != 'type'){
+                        if (PartsId != 'type') {
                             if (this.DiscoveredAccessories.Partitions[PartsId].Required == true ) {
                                 this.log.info('PreConf Accessory => Configuration for Partitions Id : %s and labeled "%s"', this.DiscoveredAccessories.Partitions[PartsId].Id, this.DiscoveredAccessories.Partitions[PartsId].name);
                                 var PartConfig = {
@@ -342,7 +342,7 @@ class RiscoPanelPlatform {
             case 'Groups':
                 this.log.info('Add Accessory => Add Groups');
                 for (var GroupsId in this.DiscoveredAccessories.Groups) {
-                    if (GroupsId != 'type'){
+                    if (GroupsId != 'type') {
                         if (this.DiscoveredAccessories.Groups[GroupsId].Required == true ) {
                             this.log.info('PreConf Accessory => Configuration for Groups Id : %s and labeled "%s"', this.DiscoveredAccessories.Groups[GroupsId].Id, this.DiscoveredAccessories.Groups[GroupsId].name);
                             var GroupConfig = {
