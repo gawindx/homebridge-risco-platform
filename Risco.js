@@ -34,7 +34,7 @@ class RiscoPanelSession {
                                         self.Custom_Cmd = true;
                                         return aConfig['armCommand'];
                                     }
-                                }) || 'armed';
+                                })() || 'armed';
         this.Custom_nightCommand = ( () => {
                                     const regtest = RegExp('\\d:.*');
                                     if (regtest.test(aConfig['nightCommand'])) {
@@ -43,7 +43,7 @@ class RiscoPanelSession {
                                         self.Custom_Cmd = true;
                                         return aConfig['nightCommand'];
                                     }
-                                }) || 'partially';
+                                })() || 'partially';
         this.Custom_homeCommand = ( () => {
                                     const regtest = RegExp('\\d:.*');
                                     if (regtest.test(aConfig['homeCommand'])) {
@@ -52,7 +52,7 @@ class RiscoPanelSession {
                                         self.Custom_Cmd = true;
                                         return aConfig['homeCommand'];
                                     }
-                                }) || 'partially';
+                                })() || 'partially';
         this.Custom_disarmCommand = ( () => {
                                     const regtest = RegExp('\\d:.*');
                                     if (regtest.test(aConfig['disarmCommand'])) {
@@ -61,7 +61,7 @@ class RiscoPanelSession {
                                         self.Custom_Cmd = true;
                                         return aConfig['disarmCommand'];
                                     }
-                                }) || 'disarmed';
+                                })() || 'disarmed';
         this.Partition = aConfig['Partition'];
         this.Groups = aConfig['Groups'];
         this.Outputs = aConfig['Outputs'];
@@ -718,7 +718,7 @@ class RiscoPanelSession {
                     }
                     self.log.debug(JSON.stringify(Groups_Datas));
                     return Groups_Datas;
-                });
+                })();
                 return GroupInfo;
             } else {
                 throw new Error(`Bad HTTP Response: ${response.status}`);
@@ -823,7 +823,7 @@ class RiscoPanelSession {
                     }
                     self.log.debug(JSON.stringify(Outputs_Datas));
                     return Outputs_Datas;
-                });
+                })();
                 return OutputInfo;
             } else {
                 throw new Error(`Bad HTTP Response: ${response.status}`);
@@ -1121,26 +1121,24 @@ class RiscoPanelSession {
                     self.DiscoveredAccessories.Partitions[0].OnAlarm = false;
                 }
                 //Determine Occupancy State
-                if ((body.detectors != null) && (self.DiscoveredAccessories.Detectors != undefined)) {
+                if (body.detectors != null) {
                     var ReadyState = true;
                     var PReadyState = true;
-                    for (var PartId in body.detectors.parts) {
-                        const Detectors = JSON.parse(JSON.stringify(body.detectors.parts[PartId].detectors));
-                        Object.values(Detectors).filter(detector => {
-                            if (detector.data_icon == 'detector2'){
-                                return true;
-                            } else {
-                                return false;
-                            }
-                        })
-                        .forEach(detector => {
-                            if (detector.bypassed == false){
-                                if (self.DiscoveredAccessories.Detectors[detector.id].accessorytype != 'Detector' ){
-                                    PReadyState = false;
+                    if (self.DiscoveredAccessories.Detectors != undefined) {
+                        for (var PartId in body.detectors.parts) {
+                            const Detectors = JSON.parse(JSON.stringify(body.detectors.parts[PartId].detectors));
+                            Object.values(Detectors).filter(detector => {
+                                return ((detector.data_icon == 'detector2') ? true : false )
+                            })
+                            .forEach(detector => {
+                                if (detector.bypassed == false) {
+                                    if (self.DiscoveredAccessories.Detectors[detector.id].accessorytype != 'Detector' ){
+                                        PReadyState = false;
+                                    }
+                                    ReadyState = false;
                                 }
-                                ReadyState = false;
-                            }
-                        });
+                            });
+                        }
                     }
                     self.DiscoveredAccessories.Partitions[0].Ready = ReadyState;
                     self.DiscoveredAccessories.Partitions[0].PReady = PReadyState;
@@ -1161,34 +1159,31 @@ class RiscoPanelSession {
                         }
                     }
                 }
-                if ((body.detectors != null) && (self.DiscoveredAccessories.Detectors != undefined)) {
+                if (body.detectors != null) {
                     for (var PartId in body.detectors.parts) {
                         const Id = body.detectors.parts[PartId].id;
                         const Detectors = JSON.parse(JSON.stringify(body.detectors.parts[PartId].detectors));
                         var ReadyState = true;
                         var PReadyState = true;
-
-                        self.DiscoveredAccessories.Partitions[Id].previousState = self.DiscoveredAccessories.Partitions[Id].actualState;
-                        self.DiscoveredAccessories.Partitions[Id].actualState = (body.detectors.parts[PartId].armIcon).match(/ico-(.*)\.png/)[1];
-                        self.log.debug('Partition Id: %s Label: %s',Id, self.DiscoveredAccessories.Partitions[Id].name)
-                        self.log.debug('Previous State: %s', self.DiscoveredAccessories.Partitions[Id].previousState);
-                        self.log.debug('Actual State: %s', self.DiscoveredAccessories.Partitions[Id].actualState);
-                        //Determine Occupancy State
-                        Object.values(Detectors).filter(detector => {
-                            if (detector.data_icon == 'detector2') {
-                                return true;
-                            } else {
-                                return false;
-                            }
-                        })
-                        .forEach(detector => {
-                            if (detector.bypassed == false) {
-                                if (self.DiscoveredAccessories.Detectors[detector.id].accessorytype != 'Detector' ) {
-                                    PReadyState = false;
+                        if (self.DiscoveredAccessories.Detectors != undefined) {
+                            self.DiscoveredAccessories.Partitions[Id].previousState = self.DiscoveredAccessories.Partitions[Id].actualState;
+                            self.DiscoveredAccessories.Partitions[Id].actualState = (body.detectors.parts[PartId].armIcon).match(/ico-(.*)\.png/)[1];
+                            self.log.debug('Partition Id: %s Label: %s',Id, self.DiscoveredAccessories.Partitions[Id].name)
+                            self.log.debug('Previous State: %s', self.DiscoveredAccessories.Partitions[Id].previousState);
+                            self.log.debug('Actual State: %s', self.DiscoveredAccessories.Partitions[Id].actualState);
+                            //Determine Occupancy State
+                            Object.values(Detectors).filter(detector => {
+                                return ((detector.data_icon == 'detector2') ? true : false )
+                            })
+                            .forEach(detector => {
+                                if (detector.bypassed == false) {
+                                    if (self.DiscoveredAccessories.Detectors[detector.id].accessorytype != 'Detector' ){
+                                        PReadyState = false;
+                                    }
+                                    ReadyState = false;
                                 }
-                                ReadyState = false;
-                            }
-                        });
+                            });
+                        }
                         self.DiscoveredAccessories.Partitions[Id].Ready = ReadyState;
                         self.DiscoveredAccessories.Partitions[Id].PReady = PReadyState;
                         if (ReadyState === false) {
