@@ -74,7 +74,7 @@ class RiscoPanelPlatform {
             setTimeout( async () => {
                 this.log.info('Accessories Init Phase Started');
                 await this.DiscoverAccessoriesFromRiscoCloud();
-                this.log.debug('Discovered Accessories:\n%s', JSON.stringify(this.DiscoveredAccessories));
+                this.log.debug('Discovered Accessories:\n%s', JSON.stringify(this.DiscoveredAccessories, null, 4));
                 this.log.info('PreConf Phase Started');
                 try {
                     for (var DeviceFamily in this.DiscoveredAccessories) {
@@ -84,10 +84,10 @@ class RiscoPanelPlatform {
                 } catch (err) {
                     this.log.error('Error on PreConf Phase: ' + err);
                 }
-                this.log.debug('PreConfigured Accessories:\n%s', JSON.stringify(this.DiscoveredAccessories));
+                this.log.debug('PreConfigured Accessories:\n%s', JSON.stringify(this.DiscoveredAccessories, null, 4));
                 this.log.info('PreConf Phase Ended');
                 this.log.info('Create Accessory Phase Started');
-                this.log.debug('Devices:\n%s', JSON.stringify(this.Devices));
+                this.log.debug('Devices:\n%s', JSON.stringify(this.Devices, null, 4));
                 try {
                     if (this.hasCachedAccessory) {
                         await new Promise(r => setTimeout(r, 5000));
@@ -124,7 +124,7 @@ class RiscoPanelPlatform {
             this.log.info('Restoring or Set Removing accessory %s', accessory.displayName);
             this.Devices.filter(new_device => (new_device.context.longName == accessory.context.longName) && (new_device.context.Required == true))
                 .map(new_device => {
-                    self.log.debug('Device to reconfigure:\n%s',JSON.stringify(new_device));
+                    self.log.debug('Device to reconfigure:\n%s',JSON.stringify(new_device, null, 4));
                     self._addOrConfigure(accessory, new_device, accessory.context.accessorytype, false);
                     KeepAccessory = true;
                 });
@@ -145,7 +145,7 @@ class RiscoPanelPlatform {
         accessory.context = DiscoveredAcc.context;
 
         if ((this.accessories.filter(device => (device.UUID == uuid))).length == 0) {
-            this.log.debug('PreConfigured Accessories To configure:\n%s', JSON.stringify(DiscoveredAcc));
+            this.log.debug('PreConfigured Accessories To configure:\n%s', JSON.stringify(DiscoveredAcc, null, 4));
             this.log.info('Adding new accessory with Name: %s, Id: %s, type: %s', DiscoveredAcc.context.name, DiscoveredAcc.context.Id, DiscoveredAcc.context.accessorytype);
             this._addOrConfigure(accessory, DiscoveredAcc, DiscoveredAcc.context.accessorytype, true);
             this.accessories.push(accessory);
@@ -298,7 +298,7 @@ class RiscoPanelPlatform {
                             const Modified_Detectors = this.config['Custom'][this.Custom_Types[Custom_Type]].split(',').map(function(item) {
                                 return parseInt(item, 10);
                             });
-                            this.log.debug('Modified Detectors:\n%s', JSON.stringify(Modified_Detectors));
+                            this.log.debug('Modified Detectors:\n%s', JSON.stringify(Modified_Detectors, null, 4));
                             for (var Id_Detector in Modified_Detectors) {
                                 this.log.debug('Detector Name/Id: %s/%s Modified to %s', this.DiscoveredAccessories.Detectors[Modified_Detectors[Id_Detector]].name, this.DiscoveredAccessories.Detectors[Modified_Detectors[Id_Detector]].Id, this.Custom_Types[Custom_Type]);
                                 this.DiscoveredAccessories.Detectors[Modified_Detectors[Id_Detector]].accessorytype = this.Custom_Types[Custom_Type];

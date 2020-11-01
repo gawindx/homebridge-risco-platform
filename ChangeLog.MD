@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.1.11 (2020-11-01)
+
+* Correction of an error during an alarm, the state of the system was sometimes incorrectly reported (system seen as disarmed) and could require an arming before being able to disarm (#1)
+* The json type debugs are now logged with an easily readable formatting (implementation of an indentation)
+* **Following improved ES6 syntax support, correction of syntax error causing:**
+  * impossible to use outputs
+
+
 ## 1.1.10 (2020-10-31)
 
 * **Following improved ES6 syntax support, correction of syntax error causing:**

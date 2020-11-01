@@ -127,7 +127,7 @@ class RiscoPanelSession {
             if (htmltest == true) {
                 if (response.data.error != 0){
                     self.log.debug('Got Invalid RiscoCloud\'s Response from %s. Retry...', functionName);
-                    self.log.debug('Bad response:\n%s', JSON.stringify(response.data));
+                    self.log.debug('Bad response:\n%s', JSON.stringify(response.data, null, 4));
                     ++self.BadResponseCounter;
                     if (self.BadResponseCounter >= 5) {
                         self.SessionLogged = false;
@@ -139,7 +139,7 @@ class RiscoPanelSession {
                 } else {
                     self.BadResponseCounter = 0;
                     self.log.debug('Got Valid RiscoCloud\'s Response from %s. Continue...', functionName);
-                    self.log.debug('Valid Response:\n%s', JSON.stringify(response.data));
+                    self.log.debug('Valid Response:\n%s', JSON.stringify(response.data, null, 4));
                     return true;
                 }
             } else {
@@ -554,7 +554,7 @@ class RiscoPanelSession {
                             } else {
                                 return 'disarmed';
                             }    
-                        }),
+                        })(),
                         armCommand: this.Custom_armCommand,
                         nightCommand: this.Custom_nightCommand,
                         homeCommand: this.Custom_homeCommand,
@@ -679,7 +679,7 @@ class RiscoPanelSession {
                                     }
                                 }
                                 return resultArray;
-                            }),
+                            })(),
                             Required: null,
                             accessorytype: 'Groups',
                             previousState: null,
@@ -693,7 +693,7 @@ class RiscoPanelSession {
                                         }
                                     }
                                     return result_State;
-                                }),
+                                })(),
                             OnAlarm: false
                         };
                         self.log.debug('Discovering Group : "%s" with Id: %s', Group_Data.name, Group_Data.Id);
@@ -716,7 +716,7 @@ class RiscoPanelSession {
                         }
                         Groups_Datas[Group_Data.Id] = Group_Data;
                     }
-                    self.log.debug(JSON.stringify(Groups_Datas));
+                    self.log.debug(JSON.stringify(Groups_Datas, null, 4));
                     return Groups_Datas;
                 })();
                 return GroupInfo;
@@ -784,14 +784,14 @@ class RiscoPanelSession {
                                     } else {
                                         return 'switch';
                                     }
-                                }),
+                                })(),
                             State: ( () => {
                                     if (Output_Cmd.match(/(\d)\)$/) == null) {
                                         return false;
                                     } else {
                                        return ((Math.abs(parseInt(Output_Cmd.match(/(\d)\)$/)[1]) - 1)) ? true : false);
                                     }
-                                })
+                                })()
                         };
                         self.log.debug('Discovering Outputs : %s with Id : %s', Output_Data.name, Output_Data.Id);
                         if (self.Outputs == 'all') {
@@ -821,7 +821,7 @@ class RiscoPanelSession {
                         self.log.debug('State: %s', Output_Data.State);
                         Outputs_Datas[Output_Data.Id] = Output_Data;
                     }
-                    self.log.debug(JSON.stringify(Outputs_Datas));
+                    self.log.debug(JSON.stringify(Outputs_Datas, null, 4));
                     return Outputs_Datas;
                 })();
                 return OutputInfo;
@@ -867,11 +867,11 @@ class RiscoPanelSession {
             if (response.status == 200) {
                 self.log.debug('Detectors/Get status:\n%s', response.status);
                 var DetectorsInfos = ( () => {
-                    self.log.debug(JSON.stringify(response.data));
+                    self.log.debug(JSON.stringify(response.data, null, 4));
                     var Detectors_Datas = {};
                     for (var Parts in response.data.detectors.parts) {
                         for (var Detector in response.data.detectors.parts[Parts].detectors) {
-                            self.log.debug(JSON.stringify(response.data.detectors.parts[Parts].detectors[Detector]));
+                            self.log.debug(JSON.stringify(response.data.detectors.parts[Parts].detectors[Detector], null, 4));
                             const DetectorName = ( () => {
                                             var tmp_name = response.data.detectors.parts[Parts].detectors[Detector].name;
                                             return tmp_name.replace(/&#(\d+);/g, function(match, dec) {
@@ -975,10 +975,10 @@ class RiscoPanelSession {
             if (response.status == 200) {
                 self.log.debug('Cameras/Get status:\n%s',response.status);
                 var CamerasInfos = (function() {
-                    self.log.debug(JSON.stringify(response.data));
+                    self.log.debug(JSON.stringify(response.data, null, 4));
                     var Cameras_Datas = {};
                     for (var Camera in response.data.cameras.camInfo){
-                        self.log.debug(JSON.stringify(response.data.cameras.camInfo[Camera]));
+                        self.log.debug(JSON.stringify(response.data.cameras.camInfo[Camera], null, 4));
                         var Camera_Data = {
                                 Id: response.data.cameras.camInfo[Camera].id,
                                 name: response.data.cameras.camInfo[Camera].title,
@@ -1015,8 +1015,8 @@ class RiscoPanelSession {
                             return b.YTime.localeCompare(a.YTime);
                         });
                         for (var LogRecord in LogRecords){
-                            self.log.debug('Record Id: %s', JSON.stringify(LogRecord));
-                            self.log.debug('Record value: %s', JSON.stringify(LogRecords[LogRecord]));
+                            self.log.debug('Record Id: %s', JSON.stringify(LogRecord, null, 4));
+                            self.log.debug('Record value: %s', JSON.stringify(LogRecords[LogRecord], null, 4));
                             if (LogRecords[LogRecord].Priority == 'alarm') {
                                 self.log.debug('Event is an Alarm');
                                 ZIdAlarm.push(LogRecords[LogRecord].ZoneId);
@@ -1034,9 +1034,9 @@ class RiscoPanelSession {
                             detector(s) and deduce the partitions or group in alarm.
                         */
                         self.log.debug('No usable events. Use of the alternative method.')
-                        var Detectors = JSON.parse(JSON.stringify(self.DiscoveredAccessories.Detectors));
+                        var Detectors = JSON.parse(JSON.stringify(self.DiscoveredAccessories.Detectors, null, 4));
                         Object.values(Detectors).filter(detector => (detector.State == true))
-                            .forEach(detector => (function(){
+                            .forEach(detector => ( () => {
                                 self.log.debug('Detector %s(%s) is active', detector.name, detector.Id);
                                 self.log.debug('Detector is in partition %s', detector.Partition);
                                 PIdAlarm.push(parseInt(detector.Partition));
@@ -1046,18 +1046,18 @@ class RiscoPanelSession {
 
                     if (ZIdAlarm.length >= 1) {
                         if ((this.Detectors || 'none') != 'none') {
-                            var Detectors = JSON.parse(JSON.stringify(self.DiscoveredAccessories.Detectors));
+                            var Detectors = JSON.parse(JSON.stringify(self.DiscoveredAccessories.Detectors, null, 4));
                             Object.values(Detectors).filter(detector => ZIdAlarm.includes(detector.Id))
-                                .forEach(detector => (function(){
+                                .forEach(detector => ( () => {
                                     self.log.debug('Detector %s (%s) is active', detector.name, detector.Id);
                                     self.log.debug('Detector is in partition %s', detector.Partition);
                                     PIdAlarm.push(parseInt(detector.Partition));
                             })());
                         }
                         if ((this.Partition || 'none') != 'none') {
-                            var Partitions = JSON.parse(JSON.stringify(self.DiscoveredAccessories.Partitions));
+                            var Partitions = JSON.parse(JSON.stringify(self.DiscoveredAccessories.Partitions, null, 4));
                             Object.values(Partitions).filter(partition => PIdAlarm.includes(partition.Id))
-                                .forEach(partition => (function(){
+                                .forEach(partition => ( () => {
                                     self.log.debug('Partition %s State: %s', partition.name, partition.actualState);
                                     if (partition.actualState != 'disarmed' ){
                                         self.log.debug('Partition %s is Armed and under Alarm', partition.name) 
@@ -1069,9 +1069,9 @@ class RiscoPanelSession {
                             })());
                         }
                         if ((this.Groups || 'none') != 'none') {
-                            var Groups = JSON.parse(JSON.stringify(self.DiscoveredAccessories.Groups));
+                            var Groups = JSON.parse(JSON.stringify(self.DiscoveredAccessories.Groups, null, 4));
                             Object.values(Groups).filter(group => group.parentPart.filter(GroupID => PIdAlarm.includes(parseInt(GroupID))))
-                                .forEach(group => (function(){
+                                .forEach(group => ( () => {
                                     self.log.debug('Group State %s State: %s', group.name, group.actualState);
                                     if (group.actualState != 'disarmed' ){
                                         self.log.debug('Group %s is Armed and under Alarm', group.name) 
@@ -1126,7 +1126,7 @@ class RiscoPanelSession {
                     var PReadyState = true;
                     if (self.DiscoveredAccessories.Detectors != undefined) {
                         for (var PartId in body.detectors.parts) {
-                            const Detectors = JSON.parse(JSON.stringify(body.detectors.parts[PartId].detectors));
+                            const Detectors = JSON.parse(JSON.stringify(body.detectors.parts[PartId].detectors, null, 4));
                             Object.values(Detectors).filter(detector => {
                                 return ((detector.data_icon == 'detector2') ? true : false )
                             })
@@ -1162,7 +1162,7 @@ class RiscoPanelSession {
                 if (body.detectors != null) {
                     for (var PartId in body.detectors.parts) {
                         const Id = body.detectors.parts[PartId].id;
-                        const Detectors = JSON.parse(JSON.stringify(body.detectors.parts[PartId].detectors));
+                        const Detectors = JSON.parse(JSON.stringify(body.detectors.parts[PartId].detectors, null, 4));
                         var ReadyState = true;
                         var PReadyState = true;
                         if (self.DiscoveredAccessories.Detectors != undefined) {
@@ -1194,7 +1194,7 @@ class RiscoPanelSession {
                         }
                     }
                 }
-                var Partitions = JSON.parse(JSON.stringify(self.DiscoveredAccessories.Partitions));
+                var Partitions = JSON.parse(JSON.stringify(self.DiscoveredAccessories.Partitions, null, 4));
                 Object.values(Partitions).filter(partition => ((partition.OnAlarm == true) && (partition.actualState == "disarmed")))
                     .forEach(partition => (function() {
                         self.log.debug('Partition %s Reset OnAlarm State', partition.name);
@@ -1225,7 +1225,7 @@ class RiscoPanelSession {
                 self.log.debug('Previous State: %s', self.DiscoveredAccessories.Groups[Id].previousState);
                 self.log.debug('Actual State: %s', self.DiscoveredAccessories.Groups[Id].actualState);
             }
-            const Groups = JSON.parse(JSON.stringify(self.DiscoveredAccessories.Groups));
+            const Groups = JSON.parse(JSON.stringify(self.DiscoveredAccessories.Groups, null, 4));
             Object.values(Groups).filter(group => ((group.OnAlarm == true) && (group.actualState == 'disarmed')))
                 .forEach(group => {
                     self.log.debug('Groups %s Reset OnAlarm State', group.name);
@@ -1327,7 +1327,7 @@ class RiscoPanelSession {
                         if (response.data.eh != null) {
                             self.log.debug('Last Events Updated');
                             self.LastEvent = response.data.eh[0];
-                            self.log.debug('Last Events New Value:\n%s', JSON.stringify(self.LastEvent));
+                            self.log.debug('Last Events New Value:\n%s', JSON.stringify(self.LastEvent, null, 4));
                         }
                         if (response.data.OngoingAlarm == true) {
                             self.log.debug('CPanel is under Alarm');
@@ -1497,7 +1497,7 @@ class RiscoPanelSession {
                 //response for pulse switch ok : {error: 0, haSwitch: [], devId: 2}
                 if (response.data.error != 0) {
                     self.log.debug('HACommand Not Ok. Using this result for status update');
-                    self.log.debug('errType:\n%s', JSON.stringify(response.data));
+                    self.log.debug('errType:\n%s', JSON.stringify(response.data, null, 4));
                     self.UpdateCPStates(response.data);
                     return false;
                 } else {
@@ -1550,7 +1550,7 @@ class RiscoPanelSession {
             if (response.status == 200) {
                 if (response.data.error != 0) {
                     self.log.debug('SetBypass Not Ok. Using this result for status update');
-                    self.log.debug('errType:\n%s', JSON.stringify(response.data));
+                    self.log.debug('errType:\n%s', JSON.stringify(response.data, null, 4));
                     self.UpdateCPStates(response.data);
                     return false;
                 } else {
