@@ -418,7 +418,6 @@ class RiscoCPPartitions {
             }
             if (ItemStates.length != 0) {
                 self.OccupancyState = ((ItemStates[0].Ready)? 0 : 1 );
-                self.log.error("State for %s: %s", self.name, PGsStatesRegistry[ItemStates[0].actualState]);
                 self.riscoCurrentState = PGsStatesRegistry[ItemStates[0].actualState];
                 self.riscoTargetState = self.riscoCurrentState;
                 if (ItemStates[0].OnAlarm == true) {
