@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.2.0 (2020-15-11)
+
+* Added functionality for combined elements (Door, Window and Garage Door are supported)
+* The functionality used to prevent the commissioning of an occupied partition was suspended until a better solution was implemented (could lead to an inability to arm).
+* Improved management and error detection during http requests to RiscoCloud and the appearance of a 500 error.
+
 ## 1.1.11 (2020-11-01)
 
 * Correction of an error during an alarm, the state of the system was sometimes incorrectly reported (system seen as disarmed) and could require an arming before being able to disarm (#1)

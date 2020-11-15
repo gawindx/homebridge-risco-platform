@@ -24,6 +24,17 @@
                 "Contact Sensor": "all|0,1,2,....",
                 "Vibrate Sensor": "all|0,1,2,....",
                 "Smoke Sensor": "all|0,1,2,....",
+            },
+            "Combined": {
+                "Door": [
+                    {"In": "X", "Out": "Y"}
+                ],
+                "Window": [
+                    {"In": "X", "Out": "Y"}
+                ],
+                "GarageDoor": [
+                    {"In": "X", "Out": "Y"}
+                ]
             }
         }
     ]

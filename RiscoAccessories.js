@@ -210,6 +210,7 @@ class RiscoCPPartitions {
                 }
             } else {
                 //if arm, away or night are customized, then pass occupancy verification
+                /* Disable Occupancy Test While best method are develloped
                 if (!(self.RiscoSession.Custom_Cmd)) {
                     switch (state) {
                         case 0:
@@ -232,7 +233,7 @@ class RiscoCPPartitions {
                             }
                             break;
                     }
-                }
+                }*/
                 if (state != self.riscoTargetState) {
                     if (self.RiscoPartId != null ){
                         PartId = self.RiscoPartId;
@@ -679,9 +680,11 @@ class RiscoCPBaseDetectors {
 
         this.Service = this.api.hap.Service;
         this.Characteristic = this.api.hap.Characteristic;
+        this.secondCharac = undefined;
 
         this.SetServicesAccessory();
         this.SetExcludeServicesAccessory();
+        this.DefineAccessoryVariable();
 
         this.DetectorReady = false;
 
@@ -706,6 +709,7 @@ class RiscoCPBaseDetectors {
             this.removemainListeners();
             this.removeExcludeListeners();
         });
+
 
         this.PollingLoop();
     }
@@ -756,6 +760,37 @@ class RiscoCPBaseDetectors {
             .getCharacteristic(this.Characteristic.On)
             .removeListener('get', this.getCurrentExcludeState)
             .removeListener('set', this.setCurrentExcludeState);
+    }
+
+    GetAccessoryState(state, AsHomeKitValue = true) {
+        /*
+        Adapt the status of the accessory according to the response expected by Homekit according to the type of accessory
+        */
+        var self = this;
+        if (AsHomeKitValue) {
+            return ((state) ? self.ActiveValue : self.InactiveValue);
+        } else {
+            return ((state) ? self.ActiveStr : self.InactiveStr);
+        }
+    }
+
+    ReportAccessoryState(state = null) {
+        var self = this;
+        if (state != null) {
+            self.RiscoDetectorState = state[0];
+            self.RiscoDetectorBypassState = state[1];
+        }
+        try {
+            self.mainService.updateCharacteristic(self.mainCharac, self.GetAccessoryState(self.RiscoDetectorState));
+            if (self.secondCharac !== undefined) {
+                self.mainService.updateCharacteristic(self.secondCharac, self.GetAccessoryState(self.RiscoDetectorState));
+            }
+            self.ExcludeService.updateCharacteristic(self.Characteristic.On, ((self.RiscoDetectorBypassState) ? false : true));
+            return;
+        } catch (err) {
+            self.log.error('Error on RiscoCPCDoor/ReportAccessoryState:\n%s', err);
+            return;
+        }
     }
 
     async getRefreshState(callback) {
@@ -906,38 +941,18 @@ class RiscoCPDetectors extends RiscoCPBaseDetectors {
         this.sPrefix = 'Detector';
     }
 
+    DefineAccessoryVariable() {
+        this.mainCharac = this.Characteristic.MotionDetected;
+        this.ActiveValue = true;
+        this.InactiveValue = false;
+        this.ActiveStr = 'Active';
+        this.InactiveStr = 'Inactive';
+    }
+
     removemainListeners() {
         this.mainService
             .getCharacteristic(this.Characteristic.MotionDetected)
             .removeListener('get', this.getCurrentState);
-    }
-
-    ReportAccessoryState(state = null) {
-        var self = this;
-        if (state != null) {
-            self.RiscoDetectorState = state[0];
-            self.RiscoDetectorBypassState = state[1];
-        }
-        try {
-            self.mainService.updateCharacteristic(self.Characteristic.MotionDetected, self.GetAccessoryState(self.RiscoDetectorState));
-            self.ExcludeService.updateCharacteristic(self.Characteristic.On, (self.RiscoDetectorBypassState)?false : true);
-            return;
-        } catch (err) {
-            self.log.error('Error on RiscoCPDetectors/ReportAccessoryState:\n%s', err);
-            return;
-        }
-    }
-
-    GetAccessoryState(state, AsHomeKitValue = true) {
-        /*
-        Adapt the status of the accessory according to the response expected by Homekit according to the type of accessory
-        */
-        var self = this;
-        if (AsHomeKitValue) {
-            return ((state) ? true : false);
-        } else {
-            return ((state) ? 'Active' : 'Inactive');
-        }
     }
 }
 
@@ -954,44 +969,24 @@ class RiscoCPCDoor extends RiscoCPBaseDetectors {
         this.sPrefix = 'Door Contact';
     }
 
+    DefineAccessoryVariable() {
+        this.mainCharac = this.Characteristic.CurrentPosition;
+        this.secondCharac = this.Characteristic.TargetPosition;
+        this.ActiveValue = 100;
+        this.InactiveValue = 0;
+        this.ActiveStr = 'open';
+        this.InactiveStr = 'closed';
+    }
+
     removemainListeners() {
         this.mainService
             .getCharacteristic(this.Characteristic.CurrentPosition)
             .removeListener('get', this.getCurrentState);
     }
-
-    ReportAccessoryState(state = null) {
-        var self = this;
-        if (state != null) {
-            self.RiscoDetectorState = state[0];
-            self.RiscoDetectorBypassState = state[1];
-        }
-        try {
-            self.mainService.updateCharacteristic(self.Characteristic.CurrentPosition, self.GetAccessoryState(self.RiscoDetectorState));
-            self.mainService.updateCharacteristic(self.Characteristic.TargetPosition, self.GetAccessoryState(self.RiscoDetectorState));
-            self.ExcludeService.updateCharacteristic(self.Characteristic.On, (self.RiscoDetectorBypassState)?false : true);
-            return;
-        } catch (err) {
-            self.log.error('Error on RiscoCPCDoor/ReportAccessoryState:\n%s', err);
-            return;
-        }
-    }
-
-    GetAccessoryState(state, AsHomeKitValue = true) {
-        /*
-        Adapt the status of the accessory according to the response expected by Homekit according to the type of accessory
-        */
-        var self = this;
-        if (AsHomeKitValue) {
-            return ((state) ? 100 : 0);
-        } else {
-            return ((state) ? 'open' : 'closed');
-        }
-    }
 }
 
 class RiscoCPCWindow extends RiscoCPBaseDetectors {
-    constructor(log, accConfig, api, accessory, TypeOfAcc = 'group') {
+    constructor(log, accConfig, api, accessory) {
         super(log, accConfig, api, accessory);
     }
 
@@ -1003,44 +998,24 @@ class RiscoCPCWindow extends RiscoCPBaseDetectors {
         this.sPrefix = 'Window Contact';
     }
 
+    DefineAccessoryVariable() {
+        this.mainCharac = this.Characteristic.CurrentPosition;
+        this.secondCharac = this.Characteristic.TargetPosition;
+        this.ActiveValue = 100;
+        this.InactiveValue = 0;
+        this.ActiveStr = 'open';
+        this.InactiveStr = 'closed';
+    }
+
     removemainListeners() {
         this.mainService
             .getCharacteristic(this.Characteristic.CurrentPosition)
             .removeListener('get', this.getCurrentState);
     }
-
-    ReportAccessoryState(state = null) {
-        var self = this;
-        if (state != null) {
-            self.RiscoDetectorState = state[0];
-            self.RiscoDetectorBypassState = state[1];
-        }
-        try {
-            self.mainService.updateCharacteristic(self.Characteristic.CurrentPosition, self.GetAccessoryState(self.RiscoDetectorState));
-            self.mainService.updateCharacteristic(self.Characteristic.TargetPosition, self.GetAccessoryState(self.RiscoDetectorState));
-            self.ExcludeService.updateCharacteristic(self.Characteristic.On, (self.RiscoDetectorBypassState)?false : true);
-            return;
-        } catch (err) {
-            self.log.error('Error on RiscoCPCWindow/ReportAccessoryState:\n%s', err);
-            return;
-        }
-    }
-
-    GetAccessoryState(state, AsHomeKitValue = true) {
-        /*
-        Adapt the status of the accessory according to the response expected by Homekit according to the type of accessory
-        */
-        var self = this;
-        if (AsHomeKitValue) {
-            return ((state) ? 100 : 0);
-        } else {
-            return ((state) ? 'open' : 'closed');
-        }
-    }
 }
 
 class RiscoCPCContactSensor extends RiscoCPBaseDetectors {
-    constructor(log, accConfig, api, accessory, TypeOfAcc = 'group') {
+    constructor(log, accConfig, api, accessory) {
         super(log, accConfig, api, accessory);
     }
 
@@ -1052,38 +1027,18 @@ class RiscoCPCContactSensor extends RiscoCPBaseDetectors {
         this.sPrefix = 'Contact Sensor';
     }
 
+    DefineAccessoryVariable() {
+        this.mainCharac = this.Characteristic.ContactSensorState;
+        this.ActiveValue = true;
+        this.InactiveValue = false;
+        this.ActiveStr = 'Active';
+        this.InactiveStr = 'Inactive';
+    }
+
     removemainListeners() {
         this.mainService
             .getCharacteristic(this.Characteristic.ContactSensorState)
             .removeListener('get', this.getCurrentState);
-    }
-
-    ReportAccessoryState(state = null) {
-        var self = this;
-        if (state != null) {
-            self.RiscoDetectorState = state[0];
-            self.RiscoDetectorBypassState = state[1];
-        }
-        try {
-            self.mainService.updateCharacteristic(self.Characteristic.ContactSensorState, self.GetAccessoryState(self.RiscoDetectorState));
-            self.ExcludeService.updateCharacteristic(self.Characteristic.On, (self.RiscoDetectorBypassState)?false : true);
-            return;
-        } catch (err) {
-            self.log.error('Error on RiscoCPCContactSensor/ReportAccessoryState:\n%s', err);
-            return;
-        }
-    }
-
-    GetAccessoryState(state, AsHomeKitValue = true) {
-        /*
-        Adapt the status of the accessory according to the response expected by Homekit according to the type of accessory
-        */
-        var self = this;
-        if (AsHomeKitValue) {
-            return ((state) ? true : false);
-        } else {
-            return ((state) ? 'Active' : 'Inactive');
-        }
     }
 }
 
@@ -1100,38 +1055,18 @@ class RiscoCPCVibrateSensor extends RiscoCPBaseDetectors {
         this.sPrefix = 'Vibrate Sensor';
     }
 
+    DefineAccessoryVariable() {
+        this.mainCharac = this.Characteristic.MotionDetected;
+        this.ActiveValue = true;
+        this.InactiveValue = false;
+        this.ActiveStr = 'Active';
+        this.InactiveStr = 'Inactive';
+    }
+
     removemainListeners() {
         this.mainService
             .getCharacteristic(this.Characteristic.MotionDetected)
             .removeListener('get', this.getCurrentState);
-    }
-
-    ReportAccessoryState(state = null) {
-        var self = this;
-        if (state != null) {
-            self.RiscoDetectorState = state[0];
-            self.RiscoDetectorBypassState = state[1];
-        }
-        try {
-            self.mainService.updateCharacteristic(self.Characteristic.MotionDetected, self.GetAccessoryState(self.RiscoDetectorState));
-            self.ExcludeService.updateCharacteristic(self.Characteristic.On, (self.RiscoDetectorBypassState)?false : true);
-            return;
-        } catch (err) {
-            self.log.error('Error on RiscoCPDetectors/ReportAccessoryState:\n%s', err);
-            return;
-        }
-    }
-
-    GetAccessoryState(state, AsHomeKitValue = true) {
-        /*
-        Adapt the status of the accessory according to the response expected by Homekit according to the type of accessory
-        */
-        var self = this;
-        if (AsHomeKitValue) {
-            return ((state) ? true : false);
-        } else {
-            return ((state) ? 'Active' : 'Inactive');
-        }
     }
 }
 
@@ -1148,26 +1083,291 @@ class RiscoCPCSmokeSensor extends RiscoCPBaseDetectors {
         this.sPrefix = 'Smoke Sensor';
     }
 
+    DefineAccessoryVariable() {
+        this.mainCharac = this.Characteristic.SmokeDetected;
+        this.ActiveValue = 1;
+        this.InactiveValue = 0;
+        this.ActiveStr = 'Active';
+        this.InactiveStr = 'Inactive';
+    }
+
     removemainListeners() {
         this.mainService
             .getCharacteristic(this.Characteristic.SmokeDetected)
             .removeListener('get', this.getCurrentState);
     }
+}
 
-    ReportAccessoryState(state = null) {
+class RiscoCPCombDevices {
+    constructor(log, accConfig, api, accessory) {
+        this.log = log;
+        this.name = accConfig.context.name;
+        this.RiscoSession = accConfig.RiscoSession;
+        this.Type = accConfig.context.accessorytype;
+        this.RiscoCombinedId = accConfig.context.Id;
+        this.RiscoInId = accConfig.context.InId;
+        this.RiscoOutId = accConfig.context.OutId;
+        this.OpeningMode = 'startstopstart';
+        this.Moving = false;
+        this.MovingDelai = 20000;
+        this.MovingTimeStep = 1000;
+        this.MovingTimePosition = 0;
+        this.TypePulse = ( () => {
+            if (accConfig.context.OutType == 'pulse') {
+                return true;
+            } else {
+                return false;
+            }
+        })();
+        this.polling = accConfig.polling || false;
+        this.pollInterval = accConfig.pollInterval || 30000;
+        this.accessory = accessory;
+        this.api = api;
+
+        this.Service = this.api.hap.Service;
+        this.Characteristic = this.api.hap.Characteristic;
+
+        this.SetServicesAccessory();
+        this.SetExcludeServicesAccessory();
+        this.DefineAccessoryVariable();
+
+        this.CombinedReady = false;
+        this.IsPulsed = false;
+
+        // Default Value
+        this.log.debug('%s "%s" default State: %s',this.sPrefix, this.name, accConfig.context.State);
+        
+        this.RiscoCurrentOutState;
+        this.RiscoTargetOutState;
+
+        this.RiscoInputState = accConfig.context.State;
+        this.RiscoInputBypassState = accConfig.context.Bypassed;
+        this.long_event_name = `long_comb_${this.RiscoCombinedId}_${(this.name.toLowerCase()).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ /g, '_')}`;
+
+        this.PollingLoop();
+    }
+
+    PollingLoop() {
         var self = this;
-        if (state != null) {
-            self.RiscoDetectorState = state[0];
-            self.RiscoDetectorBypassState = state[1];
+        // set up polling if requested
+        if (self.polling) {
+            var emitter = new pollingtoevent( (done) => {
+                self.getRefreshState( (err, result) => {
+                    done(err, result);
+                });
+            }, {
+                longpollEventName: self.long_event_name,
+                longpolling: true,
+                interval: 1000
+            });
+
+            emitter.on(self.long_event_name, (state) => {
+                self.log.info('%s "%s" => New state detected: (%s). Notify!', self.sPrefix, self.name, self.GetAccessoryState(state[0], false));
+                self.log.info('%s "%s" => New Bypass State detected : (%s). Notify!', self.sPrefix, self.name, ((state[1]) ? 'ByPassed' : 'Not ByPassed'));
+                self.ReportAccessoryState(state);
+            });
+
+            emitter.on('err', (err) => {
+                self.log.error('Polling failed, error was %s', err);
+            });
+
+            self.api.once('shutdown', () => {
+                self.log.debug('Remove All Listeners for %s', self.name);
+                emitter.removeAllListeners();
+            });
         }
+    }
+
+    SetExcludeServicesAccessory() {
+        var self = this;
+        self.log.debug('Adding Exclude Switch to %s', this.name);
+        this.ExcludeService = this.accessory.getService(this.Service.Switch, this.accessory.displayName);
+        this.ExcludeService
+            .getCharacteristic(this.Characteristic.On)
+            .on('get', this.getCurrentExcludeState.bind(this))
+            .on('set', this.setCurrentExcludeState.bind(this));
+    }
+
+    removeExcludeListeners() {
+         this.ExcludeService
+            .getCharacteristic(this.Characteristic.On)
+            .removeListener('get', this.getCurrentExcludeState)
+            .removeListener('set', this.setCurrentExcludeState);
+    }
+
+    async getRefreshState(callback) {
+        var self = this;
         try {
-            self.mainService.updateCharacteristic(self.Characteristic.SmokeDetected, self.GetAccessoryState(self.RiscoDetectorState));
-            self.ExcludeService.updateCharacteristic(self.Characteristic.On, (self.RiscoDetectorBypassState)?false : true);
+            var Datas = [];
+            var ItemStates;
+            if (!(self.Moving)) {
+                if (self.RiscoCurrentOutState != self.RiscoTargetOutState) {
+                    if ((self.RiscoCurrentOutState == self.ClosingValue) && (!(self.RiscoInputState))) {
+                        self.RiscoCurrentOutState = self.ClosedStateValue;
+                    } else if ((self.RiscoCurrentOutState == self.OpeningValue) && (self.RiscoInputState)) {
+                        self.RiscoCurrentOutState = self.OpenStateValue;
+                    } else {
+                        self.RiscoCurrentOutState = self.StoppedValue;
+                    }
+                }
+            }
+            for (var Detector in self.RiscoSession.DiscoveredAccessories.Detectors) {
+                Datas.push(self.RiscoSession.DiscoveredAccessories.Detectors[Detector]);
+            }
+            ItemStates = Datas.filter(detectors => (detectors.Id == (self.RiscoInId | '')));
+
+            if (ItemStates.length != 0) {
+                self.RiscoInputState = ItemStates[0].State;
+                self.RiscoInputBypassState = ItemStates[0].Bypassed;
+                self.ReportAccessoryState();
+                self.CombinedReady = true;
+                callback(null, [self.RiscoInputState, self.RiscoInputBypassState]);
+                return;
+            } else {
+                throw new Error(`Error on ${self.sPrefix} RefreshState!!!`);
+            }
+        } catch (err) {
+            self.log.error('Error on RiscoCPCombDevices/getRefreshState:\n%s', err);
+            self.DetectorReady = true;
+            callback(null, [self.RiscoInputState, self.RiscoInputBypassState]);
+            return;
+        }
+    }
+
+    async getCurrentState(callback) {
+        var self = this;
+        try {
+            if (self.polling) {
+                self.log.debug('%s "%s" MotionDetected: %s', self.sPrefix, self.name, self.GetAccessoryState(self.RiscoInputState, false));
+                callback(null, self.RiscoInputState);
+                return;
+            } else {
+                self.log.info('%s "%s" => Getting current state - delayed...', self.sPrefix, self.name);
+                waitUntil()
+                    .interval(500)
+                    .times(15)
+                    .condition( () => {
+                        return (self.RiscoInputState ? true : false);
+                    })
+                    .done(async (result) => {
+                        await self.RiscoSession.getCPStates();
+                        await self.getRefreshState(callback);
+                        self.log.debug('%s "%s" => Actual Motion state is: (%s)', self.sPrefix, self.name, self.GetAccessoryState(self.RiscoInputState, false));
+                        self.CombinedReady = true;
+                        self.ReportAccessoryState();
+                        return
+                    });
+            }
+        } catch (err) {
+            self.log.error('Error on RiscoCPCombDevices/getCurrentState:\n%s', err);
+            self.ReportAccessoryState();
+            callback(null, self.RiscoInputState);
+            return;
+        }
+    }
+
+    async setTargetState(state, callback) {
+        var self = this;
+        try {
+            if (self.ServiceMain != self.Service.GarageDoorOpener) {
+                if (state <= self.TargetOpenStateValue) {
+                    state = self.ClosedStateValue;
+                } else {
+                    state = self.OpenStateValue;
+                }
+            } else {
+                if (state <= self.TargetOpenStateValue) {
+                    state = self.OpenStateValue;
+                } else {
+                    state = self.ClosedStateValue;
+                }
+            }
+            self.log.debug('Set %s to: %s with value: %s', self.sPrefix, ((state == self.ClosedStateValue) ? 'closed' : 'opened'), state);
+            self.RiscoTargetOutState = state;
+            var HACResp;
+            //convert state to 1/0
+
+            if (self.IsPulsed) {
+                HACResp = true;
+            } else {
+                if (self.TypePulse) {
+                    HACResp = await self.RiscoSession.HACommand('1', self.RiscoOutId);
+                } else {
+                    var newstate;
+                    if (state) {
+                        newstate = 1;
+                    } else {
+                        newstate = 0;
+                    }
+                    HACResp = await self.RiscoSession.HACommand(newstate, self.RiscoOutId);          
+                }
+            }
+            if (HACResp) {
+                if (!self.polling) {
+                    self.log.info('%s "%s" => Set new state: (%s)', self.sPrefix, self.name, state);
+                }
+                if (self.TypePulse === false) {
+                    self.RiscoTargetOutState = state;
+                    self.log.debug('Not Pulsed. %s "%s" => Set new state: (%s)', self.sPrefix, self.name, state);
+                } else {
+                    if (self.IsPulsed) {
+                        self.log.debug('Pulse switch is already pulsed');
+                        self.IsPulsed = false;
+                    } else {
+                        self.log.debug('Pulse switch is not already pulsed');
+                        self.IsPulsed = true;
+                        setTimeout(self.ResetPulseSwitchState, 500, self);
+                        if (self.Moving) {
+                            self.Moving = false;
+                        } else {
+                            self.Moving = true;
+                        }
+                    }
+                }
+                setTimeout(self.setCurrentPosition, self.MovingTimeStep, self);
+            } else {
+                throw new Error('Error on HACommand!!!');
+            }
+            typeof callback === 'function' && callback(null);
             return;
         } catch (err) {
-            self.log.error('Error on RiscoCPDetectors/ReportAccessoryState:\n%s', err);
+            self.log.error('Error on RiscoCPCombDevices/setTargetState:\n%s', err);
+            typeof callback === 'function' && callback(null);
             return;
         }
+    }
+
+    setCurrentPosition(self) {
+        //Set a fake position
+        var self = self;
+        const Step = Math.floor(100 / (self.MovingDelai / self.MovingTimeStep));
+        if (self.Moving) {
+            if (self.ServiceMain != self.Service.GarageDoorOpener) {
+                if (self.RiscoTargetOutState == self.ClosedStateValue) {
+                    self.RiscoCurrentOutState = self.RiscoCurrentOutState - Step;
+                    self.RiscoCurrentOutState = (self.RiscoCurrentOutState <= 0) ? 0 : self.RiscoCurrentOutState;
+                } else {
+                    self.RiscoCurrentOutState = self.RiscoCurrentOutState + Step;
+                    self.RiscoCurrentOutState = (self.RiscoCurrentOutState >= 100) ? 100 : self.RiscoCurrentOutState;
+                }
+            } else {
+                if (self.RiscoTargetOutState == self.ClosedStateValue) {
+                    //Closing
+                    self.RiscoCurrentOutState = 3;
+                } else {
+                    //Opening
+                    self.RiscoCurrentOutState = 2;
+                }
+            }
+            self.MovingTimePosition = self.MovingTimePosition + self.MovingTimeStep;
+            if (self.MovingTimePosition >= self.MovingDelai) {
+                self.Moving = false;
+                self.MovingTimePosition = 0;
+            }
+            setTimeout(self.setCurrentPosition, self.MovingTimeStep, self);
+        }
+        self.mainService.updateCharacteristic(self.CharacCurrentPos, self.RiscoCurrentOutState);
+        return;
     }
 
     GetAccessoryState(state, AsHomeKitValue = true) {
@@ -1176,21 +1376,263 @@ class RiscoCPCSmokeSensor extends RiscoCPBaseDetectors {
         */
         var self = this;
         if (AsHomeKitValue) {
-            return ((state) ? 1 : 0);
+            return ((state) ? self.ClosedStateValue : self.OpenStateValue);
         } else {
-            return ((state) ? 'Active' : 'Inactive');
+            return ((state) ? self.OpenStateStr : self.ClosedStateStr);
+        }
+    }
+
+    async getTargetState(callback) {
+        var self = this
+        callback(null);
+        /*callback(null, this.RiscoTargetOutState);
+        return;*/
+    }
+
+    async getCurrentExcludeState(callback) {
+        var self = this;
+        try {
+            if (self.polling) {
+                self.log.debug('%s "%s" Exclude State : (%s) => %s', self.sPrefix, self.name, self.RiscoInputBypassState, ((self.RiscoInputBypassState) ? 'Bypassed': 'Not Bypassed'));
+                callback(null, (self.RiscoInputBypassState)?false : true);
+                return;
+            } else {
+                self.log.info('%s "%s" => Getting current state - delayed...', self.sPrefix, self.name);
+                waitUntil()
+                    .interval(500)
+                    .times(15)
+                    .condition( () => {
+                        return (self.RiscoInputBypassState)?false : true;
+                    })
+                    .done(async function (result) {
+                        await self.RiscoSession.getCPStates();
+                        await self.getRefreshState(callback);
+                        self.log.debug('%s "%s" => Actual Exclude State is: %s', self.sPrefix, self.name, ((self.RiscoInputBypassState) ? 'Bypassed': 'Not Bypassed'));
+                        self.CombinedReady = true;
+                        return;
+                    });
+            }
+        } catch (err) {
+            self.log.error('Error on RiscoCPBaseDetectors/getCurrentExcludeState:\n%s', err);
+            callback(err, (self.RiscoInputBypassState)?false : true);
+            return;
+        }
+    }
+
+    async setCurrentExcludeState(state, callback) {
+        var self = this;
+        try {
+            if (self.DetectorReady) {
+                const PartId = self.RiscoSession.DiscoveredAccessories.Combineds[self.RiscoCombinedId].Partition;
+                const PartStatus = self.RiscoSession.DiscoveredAccessories.Partitions[PartId].actualState
+                var SBpResp;
+                if (PartStatus != 'disarmed') {
+                    self.log.info('Cannot Modify Exclude State of Sensor from Armed Partition');
+                    typeof callback === 'function' && callback('Cannot Modify Exclude State of Sensor from Armed Partition', 'Cannot Modify Exclude State of Sensor from Armed Partition');
+                    self.ExcludeService.updateCharacteristic(self.Characteristic.On, (self.RiscoInputBypassState)?false : true);
+                    return;
+                }
+                state = ((state) ? false : true);
+                self.log.debug('Set Exclude State of %s "%s" to: %s', self.sPrefix, self.name, ((state) ? 'Bypassed': 'Not Bypassed'));
+                self.log.debug('%s Actual State: %s', self.name, ((self.RiscoInputBypassState) ? 'Bypassed': 'Not Bypassed'));
+                self.log.debug('%s New State: %s', self.name, ((state) ? 'Bypassed': 'Not Bypassed'));
+                if (self.RiscoInputBypassState == state) {
+                    SBpResp = true;
+                    self.log.debug('%s Identical State', self.name);
+                } else {
+                    SBpResp = await self.RiscoSession.SetBypass(state, self.RiscoInId);
+                    self.log.debug('%s Different State', self.name);
+                }
+
+                if (SBpResp) {
+                    if (!self.polling) {
+                        self.log.info('%s "%s" => Set new Bypass state: (%s)', self.sPrefix, self.name, state);
+                    }
+                    typeof callback === 'function' && callback(null);
+                } else {
+                    self.log.error('Error on SetBypass!!!');
+                    typeof callback === 'function' && callback('Error on SetBypass!!!');
+                }
+                return;
+            }
+        } catch (err) {
+            self.log.error('Error on RiscoCPBaseDetectors/setCurrentExcludeState:\n%s', err);
+            self.ExcludeService.updateCharacteristic(self.Characteristic.On, (self.RiscoInputBypassState)?false : true);
+            callback(err);
+            return;
+        }
+    }
+
+    async ResetPulseSwitchState(self) {
+        var self = self;
+        self.log.debug('Reset Pulse Switch State to %s', self.RiscoOutState);
+        self.IsPulsed = false;
+    }
+
+    ReportAccessoryState(state = null) {
+        var self = this;
+        if (state != null) {
+            self.RiscoInputState = state[0];
+            self.RiscoInputBypassState = state[1];
+        }
+        try {
+            if ((self.RiscoInputState) && (!(self.Moving))) {
+                self.RiscoCurrentOutState = self.OpenStateValue;
+            } else {
+                self.RiscoCurrentOutState = self.ClosedStateValue;
+            }
+            if (!(self.CombinedReady)){
+                self.RiscoTargetOutState = self.RiscoCurrentOutState;
+            }
+            self.mainService.updateCharacteristic(self.CharacCurrentPos, self.RiscoCurrentOutState);
+            self.mainService.updateCharacteristic(self.CharacTargetPos, self.RiscoTargetOutState);
+            self.ExcludeService.updateCharacteristic(self.Characteristic.On, (self.RiscoInputBypassState) ? false : true);
+            return;
+        } catch (err) {
+            self.log.error('Error on RiscoCPCDoor/ReportAccessoryState:\n%s', err);
+            return;
         }
     }
 }
+
+class RiscoCPCombDoor extends RiscoCPCombDevices {
+    constructor (log, accConfig, api, accessory) {
+        super(log, accConfig, api, accessory);
+    }
+
+    SetServicesAccessory() {
+        this.mainService = this.accessory.getService(this.Service.Door, this.accessory.displayName);
+        this.mainService
+            .getCharacteristic(this.Characteristic.CurrentPosition)
+            .on('get', this.getCurrentState.bind(this));
+        this.mainService
+            .getCharacteristic(this.Characteristic.TargetPosition)
+            .on('get', this.getTargetState.bind(this))
+            .on('set', this.setTargetState.bind(this));
+        this.sPrefix = 'Door Opener';
+    }
+
+    DefineAccessoryVariable() {
+        this.TargetOpenStateValue = 30;
+        this.OpenStateValue = 100;
+        this.ClosedStateValue = 0;
+        this.OpenStateStr = 'open';
+        this.ClosedStateStr = 'closed';
+        this.ServiceMain = this.Service.Door;
+        this.CharacCurrentPos = this.Characteristic.CurrentPosition;
+        this.CharacTargetPos = this.Characteristic.TargetPosition;
+        this.OpeningValue = 60;
+        this.ClosingValue = 40;
+        this.StoppedValue = 50;
+    }
+
+    removemainListeners() {
+        this.mainService
+            .getCharacteristic(this.Characteristic.CurrentPosition)
+            .removeListener('get', this.getCurrentState);
+        this.mainService
+            .getCharacteristic(this.Characteristic.TargetPosition)
+            .removeListener('get', this.getTargetState)
+            .removeListener('set', this.setTargetState);
+    }
+}
+
+class RiscoCPCombWindow extends RiscoCPCombDevices {
+    constructor (log, accConfig, api, accessory) {
+        super(log, accConfig, api, accessory);
+    }
+
+    SetServicesAccessory() {
+        this.mainService = this.accessory.getService(this.Service.Window, this.accessory.displayName);
+        this.mainService
+            .getCharacteristic(this.Characteristic.CurrentPosition)
+            .on('get', this.getCurrentState.bind(this));
+        this.mainService
+            .getCharacteristic(this.Characteristic.TargetPosition)
+            .on('get', this.getTargetState.bind(this))
+            .on('set', this.setTargetState.bind(this));
+        this.sPrefix = 'Window Opener';
+    }
+
+    DefineAccessoryVariable() {
+        this.TargetOpenStateValue = 30;
+        this.OpenStateValue = 100;
+        this.ClosedStateValue = 0;
+        this.OpenStateStr = 'open';
+        this.ClosedStateStr = 'closed';
+        this.ServiceMain = this.Service.Window;
+        this.CharacCurrentPos = this.Characteristic.CurrentPosition;
+        this.CharacTargetPos = this.Characteristic.TargetPosition;
+        this.OpeningValue = 60;
+        this.ClosingValue = 40;
+        this.StoppedValue = 50;
+    }
+
+    removemainListeners() {
+        this.mainService
+            .getCharacteristic(this.Characteristic.CurrentPosition)
+            .removeListener('get', this.getCurrentState);
+        this.mainService
+            .getCharacteristic(this.Characteristic.TargetPosition)
+            .removeListener('get', this.getTargetState)
+            .removeListener('set', this.setTargetState);
+    }
+}
+
+class RiscoCPCombGarageDoor extends RiscoCPCombDevices {
+    constructor (log, accConfig, api, accessory) {
+        super(log, accConfig, api, accessory);
+    }
+
+    SetServicesAccessory() {
+        this.mainService = this.accessory.getService(this.Service.GarageDoorOpener, this.accessory.displayName);
+        this.mainService
+            .getCharacteristic(this.Characteristic.CurrentDoorState)
+            .on('get', this.getCurrentState.bind(this));
+        this.mainService
+            .getCharacteristic(this.Characteristic.TargetDoorState)
+            .on('get', this.getTargetState.bind(this))
+            .on('set', this.setTargetState.bind(this));
+        this.sPrefix = 'Garage Door Opener';
+    }
+
+    DefineAccessoryVariable() {
+        this.TargetOpenStateValue = 0;
+        this.OpenStateValue = 0;
+        this.ClosedStateValue = 1;
+        this.OpenStateStr = 'open';
+        this.ClosedStateStr = 'closed';
+        this.ServiceMain = this.Service.GarageDoorOpener;
+        this.CharacCurrentPos = this.Characteristic.CurrentDoorState;
+        this.CharacTargetPos = this.Characteristic.TargetDoorState;
+        this.OpeningValue = 2;
+        this.ClosingValue = 3;
+        this.StoppedValue = 4;
+    }
+
+    removemainListeners() {
+        this.mainService
+            .getCharacteristic(this.Characteristic.CurrentDoorState)
+            .removeListener('get', this.getCurrentState);
+        this.mainService(this.Characteristic.TargetDoorState)
+            .removeListener('get', this.getTargetState)
+            .removeListener('set', this.setTargetState);
+    }
+}
+
 
 module.exports = {
     RiscoCPPartitions: RiscoCPPartitions,
     RiscoCPGroups: RiscoCPGroups,
     RiscoCPOutputs: RiscoCPOutputs,
     RiscoCPDetectors: RiscoCPDetectors,
+    RiscoCPCombDevices: RiscoCPCombDevices,
     RiscoCPCDoor: RiscoCPCDoor,
     RiscoCPCWindow: RiscoCPCWindow,
     RiscoCPCContactSensor: RiscoCPCContactSensor,
     RiscoCPCVibrateSensor: RiscoCPCVibrateSensor,
-    RiscoCPCSmokeSensor: RiscoCPCSmokeSensor
+    RiscoCPCSmokeSensor: RiscoCPCSmokeSensor,
+    RiscoCPCombDoor: RiscoCPCombDoor,
+    RiscoCPCombWindow: RiscoCPCombWindow,
+    RiscoCPCombGarageDoor: RiscoCPCombGarageDoor
 }

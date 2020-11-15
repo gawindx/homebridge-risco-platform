@@ -143,7 +143,7 @@ class RiscoPanelSession {
                     return true;
                 }
             } else {
-                if (response.status == 302) {
+                if ( (response.status == 302) || (response.status == 500)){
                     self.log.debug('Got Invalid RiscoCloud\'s Response from %s. Retry...', functionName);
                     self.log.debug('Bad response:\n%s', response.status);
                     ++self.BadResponseCounter;
@@ -355,7 +355,7 @@ class RiscoPanelSession {
                         return Promise.reject(`Error on Request : ${error.errno}`);
                     }
                 });
-            } while (self.IsValidResponse(response, 'IsUserCodeExpired') == false);
+            } while ((self.IsValidResponse(response, 'IsUserCodeExpired') == false) || (self.IsValidResponse(response, 'IsUserCodeExpired',false ) == false));
 
             if (response.status == 200) {
                 self.log.debug('User Code Expired ? %s', response.data.pinExpired);
@@ -1034,7 +1034,7 @@ class RiscoPanelSession {
                             detector(s) and deduce the partitions or group in alarm.
                         */
                         self.log.debug('No usable events. Use of the alternative method.')
-                        var Detectors = JSON.parse(JSON.stringify(self.DiscoveredAccessories.Detectors, null, 4));
+                        var Detectors = JSON.parse(JSON.stringify(self.DiscoveredAccessories.Detectors));
                         Object.values(Detectors).filter(detector => (detector.State == true))
                             .forEach(detector => ( () => {
                                 self.log.debug('Detector %s(%s) is active', detector.name, detector.Id);
@@ -1046,7 +1046,7 @@ class RiscoPanelSession {
 
                     if (ZIdAlarm.length >= 1) {
                         if ((this.Detectors || 'none') != 'none') {
-                            var Detectors = JSON.parse(JSON.stringify(self.DiscoveredAccessories.Detectors, null, 4));
+                            var Detectors = JSON.parse(JSON.stringify(self.DiscoveredAccessories.Detectors));
                             Object.values(Detectors).filter(detector => ZIdAlarm.includes(detector.Id))
                                 .forEach(detector => ( () => {
                                     self.log.debug('Detector %s (%s) is active', detector.name, detector.Id);
@@ -1055,7 +1055,7 @@ class RiscoPanelSession {
                             })());
                         }
                         if ((this.Partition || 'none') != 'none') {
-                            var Partitions = JSON.parse(JSON.stringify(self.DiscoveredAccessories.Partitions, null, 4));
+                            var Partitions = JSON.parse(JSON.stringify(self.DiscoveredAccessories.Partitions));
                             Object.values(Partitions).filter(partition => PIdAlarm.includes(partition.Id))
                                 .forEach(partition => ( () => {
                                     self.log.debug('Partition %s State: %s', partition.name, partition.actualState);
@@ -1069,7 +1069,7 @@ class RiscoPanelSession {
                             })());
                         }
                         if ((this.Groups || 'none') != 'none') {
-                            var Groups = JSON.parse(JSON.stringify(self.DiscoveredAccessories.Groups, null, 4));
+                            var Groups = JSON.parse(JSON.stringify(self.DiscoveredAccessories.Groups));
                             Object.values(Groups).filter(group => group.parentPart.filter(GroupID => PIdAlarm.includes(parseInt(GroupID))))
                                 .forEach(group => ( () => {
                                     self.log.debug('Group State %s State: %s', group.name, group.actualState);
@@ -1162,7 +1162,7 @@ class RiscoPanelSession {
                 if (body.detectors != null) {
                     for (var PartId in body.detectors.parts) {
                         const Id = body.detectors.parts[PartId].id;
-                        const Detectors = JSON.parse(JSON.stringify(body.detectors.parts[PartId].detectors, null, 4));
+                        const Detectors = JSON.parse(JSON.stringify(body.detectors.parts[PartId].detectors));
                         var ReadyState = true;
                         var PReadyState = true;
                         if (self.DiscoveredAccessories.Detectors != undefined) {
@@ -1194,7 +1194,7 @@ class RiscoPanelSession {
                         }
                     }
                 }
-                var Partitions = JSON.parse(JSON.stringify(self.DiscoveredAccessories.Partitions, null, 4));
+                var Partitions = JSON.parse(JSON.stringify(self.DiscoveredAccessories.Partitions));
                 Object.values(Partitions).filter(partition => ((partition.OnAlarm == true) && (partition.actualState == "disarmed")))
                     .forEach(partition => (function() {
                         self.log.debug('Partition %s Reset OnAlarm State', partition.name);
@@ -1225,7 +1225,7 @@ class RiscoPanelSession {
                 self.log.debug('Previous State: %s', self.DiscoveredAccessories.Groups[Id].previousState);
                 self.log.debug('Actual State: %s', self.DiscoveredAccessories.Groups[Id].actualState);
             }
-            const Groups = JSON.parse(JSON.stringify(self.DiscoveredAccessories.Groups, null, 4));
+            const Groups = JSON.parse(JSON.stringify(self.DiscoveredAccessories.Groups));
             Object.values(Groups).filter(group => ((group.OnAlarm == true) && (group.actualState == 'disarmed')))
                 .forEach(group => {
                     self.log.debug('Groups %s Reset OnAlarm State', group.name);

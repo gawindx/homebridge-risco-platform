@@ -40,7 +40,23 @@ class RiscoPanelPlatform {
             'Vibrate Sensor': 'RiscoCPCVibrateSensor',
             'Smoke Sensor': 'RiscoCPCSmokeSensor'
         }
-
+        //Types Of Combined Accessoies
+        this.Combined_Types = [ 'Combined_GarageDoor',
+                                'Combined_Door',
+                                'Combined_Window'
+                            ];
+        //Service Associated to Combined Types
+        this.Combined_Types_Services = {
+            'Combined_GarageDoor': Service.GarageDoorOpener,
+            'Combined_Door': Service.Door,
+            'Combined_Window': Service.Window
+        };
+        //Classes Associated to Combined Types
+        this.Combined_Types_Classes = {
+            'Combined_GarageDoor': 'RiscoCPCombGarageDoor',
+            'Combined_Door': 'RiscoCPCombDoor',
+            'Combined_Window': 'RiscoCPCombWindows'
+        }
         this.accessories = [];
         this.log = log;
         this.config = config;
@@ -233,6 +249,12 @@ class RiscoPanelPlatform {
                         if (accessory.getService(this.Custom_Types_Services[type]) == undefined ) {
                             this.log.debug('Service %s not already defined on accessory %s', type, accessory.displayName);
                             accessory.addService(this.Custom_Types_Services[type], accessory.context.name);
+                            //remove also ExcludeSwitch because he became first Service
+                            if (accessory.getService(`Exclude ${accessory.displayName}`) != undefined ) {
+                                this.log.debug('Service Exclude already defined on accessory %s', accessory.displayName);
+                                this.log.debug('Remove it to avoid he became first Service');
+                                accessory.removeService(accessory.getService(`Exclude ${accessory.displayName}`));
+                            }
                         }
                         if (accessory.getService(Service.Switch) == undefined ) {
                             this.log.debug('Service Exclude not already defined on accessory %s', accessory.displayName);
@@ -246,9 +268,41 @@ class RiscoPanelPlatform {
                         }
                     }
                     new riscoAccessory[this.Custom_Types_Classes[type]](this.log, object, this.api, accessory);
+                } else if (this.Combined_Types.includes(type)) {
+                    if (add) {
+                        this.log.info('Add or Modifying Combined accessory %s', accessory.displayName);
+                        for (var AccTypes in this.Combined_Types_Services) {
+                            if ((AccTypes != type) && (accessory.getService(this.Combined_Types_Services[AccTypes]) != undefined)) {
+                                this.log.debug('Service %s already defined on accessory %s', this.Combined_Types_Services[AccTypes], accessory.displayName);
+                                this.log.debug('This service is not required anymore ; remove it');
+                                accessory.removeService(this.Combined_Types_Services[AccTypes]);
+                            }
+                        }
+                        if (accessory.getService(this.Combined_Types_Services[type]) == undefined ) {
+                            this.log.debug('Service %s not already defined on accessory %s', type, accessory.displayName);
+                            accessory.addService(this.Combined_Types_Services[type], accessory.context.name);
+                            //remove also ExcludeSwitch because he became first Service
+                            if (accessory.getService(`Exclude ${accessory.displayName}`) != undefined ) {
+                                this.log.debug('Service Exclude already defined on accessory %s', accessory.displayName);
+                                this.log.debug('Remove it to avoid he became first Service');
+                                accessory.removeService(accessory.getService(`Exclude ${accessory.displayName}`));
+                            }
+                        }
+                        if (accessory.getService(Service.Switch) == undefined ) {
+                            this.log.debug('Service Exclude not already defined on accessory %s', accessory.displayName);
+                            accessory.addService(Service.Switch, `Exclude ${accessory.displayName}`, `exclude_${accessory.context.name}`);
+                        }
+                    } else {
+                        this.log.info('Configuring Combined accessory %s',accessory.displayName);
+                        if (accessory.getService(Service.Switch) == undefined ) {
+                            this.log.debug('Service Exclude not already defined on accessory %s', accessory.displayName);
+                            accessory.addService(Service.Switch, `Exclude ${accessory.displayName}`, `exclude_${accessory.context.name}`);
+                        }
+                    }
+                    new riscoAccessory[this.Combined_Types_Classes[type]](this.log, object, this.api, accessory);
                 }
                 break;
-        }
+        };
     }
 
     _removeAccessory(accessory) {
@@ -267,6 +321,83 @@ class RiscoPanelPlatform {
                 this.log.debug('Discovering Groups');
                 this.DiscoveredAccessories.Groups = await this.RiscoPanel.DiscoverGroups();
             }
+            if ((this.config['Combined'] || 'none') != 'none') {
+                this.log.debug('Checks if the configuration is correct and consistent for the combined accessories');
+                //Check if all Combined Configuration are valid
+                var CombinedConf = {};
+                for (var Comb in this.config['Combined']) {
+                    if (!((this.Combined_Types).includes(`Combined_${Comb}`))) {
+                        continue;
+                    }
+                    const CombAccessories = this.config['Combined'][Comb];
+                    var ValidComb = [];
+                    for (var CombAcc in CombAccessories) {
+                        if (!(isNaN(CombAccessories[CombAcc].In) || isNaN(CombAccessories[CombAcc].Out) || (!CombAccessories[CombAcc].In) || (!CombAccessories[CombAcc].Out))) {
+                            ValidComb.push(CombAccessories[CombAcc]);
+                        }
+                    }
+                    this.log.debug('Found %s Valid(s) Combined Definition in Combined Type: "%s"', Object.keys(ValidComb).length, Comb);
+                    var self = this
+                    CombinedConf[Comb] = ValidComb;
+                }
+                this.config['Combined'] = CombinedConf;
+                //now, check if all required Input/Output are defined
+                var TempOutConf = (this.config['Outputs'] || 'none');
+                var TempDetConf = (this.config['Detectors'] || 'none');
+                if ((TempOutConf != 'all') || (TempDetConf != 'all')) {
+                    this.log.debug('The configuration may be not consistent for the combined accessories');
+                    this.log.debug('Let\'s change it!');
+                    var CombId = 0;
+                    for (var Comb in this.config['Combined']) {
+                        for (var CombAcc in this.config['Combined'][Comb]) {
+                            CombId++;
+                            this.log.debug('Found Valid Combined Device type: "%s". Assigned Id: %s', Comb, CombId);
+                            const TempIn = this.config['Combined'][Comb][CombAcc].In;
+                            const TempOut = this.config['Combined'][Comb][CombAcc].Out;
+                            this.log.debug('This Combined Device require input Id: %s and Output Id: %s', TempIn, TempOut);
+                            if (TempDetConf != "all") {
+                                const Required_Detectors = TempDetConf.split(',').map( (item) => {
+                                    return parseInt(item, 10);
+                                });
+                                if (Required_Detectors.includes(Number(TempIn)) !== false) {
+                                    this.log.debug('Input Id: %s is already required. Do Nothing!', TempIn);
+                                } else {
+                                    this.log.debug('Input Id: %s is not already required. Adding Them!', TempIn);
+                                    if (TempDetConf != "none") {
+                                        TempDetConf = TempDetConf.concat(',', `${TempIn}`);
+                                    } else {
+                                        TempDetConf = `${TempIn}`;
+                                    }
+                                }
+                            } else {
+                                this.log.debug('All Inputs Id are already required. Do Nothing!');
+                            }
+                            if (TempOutConf != "all") {
+                                const Required_Outputs = TempOutConf.split(',').map( (item) => {
+                                    return parseInt(item, 10);
+                                });
+                                if (Required_Outputs.includes(Number(TempOut)) !== false) {
+                                    this.log.debug('Output Id: %s is already required. Do Nothing!', TempOut);
+                                } else {
+                                    this.log.debug('Output Id: %s is not already required. Adding Them!', TempOut);
+                                    if (TempOutConf != "none") {
+                                        TempOutConf = TempOutConf.concat(',', `${TempOut}`);
+                                    } else {
+                                        TempOutConf = `${TempOut}`;
+                                    }
+                                }
+                            } else {
+                                this.log.debug('All Outputs Id are already required. Do Nothing!');
+                            }
+                        }
+                    }
+                    this.config['Detectors'] = TempDetConf;
+                    this.config['Outputs'] = TempOutConf;
+                    this.log.debug('New Configurations:\nDetectors: %s\nOutputs: %s', TempDetConf, TempOutConf);
+                } else {
+                    this.log.debug('The configuration is consistent for the combined accessories');
+                }
+            }
             if ((this.config['Outputs'] || 'none') != 'none') {
                 this.log.debug('Discovering Outputs');
                 this.DiscoveredAccessories.Outputs = await this.RiscoPanel.DiscoverOutputs();
@@ -275,15 +406,49 @@ class RiscoPanelPlatform {
                 this.log.debug('Discovering Detectors');
                 this.DiscoveredAccessories.Detectors = await this.RiscoPanel.DiscoverDetectors();
             }
-            if ((this.config['Cameras'] || 'none') != 'none') {
+            /*if ((this.config['Cameras'] || 'none') != 'none') {
                 this.log.debug('Discovering Cameras');
                 this.DiscoveredAccessories.Cameras = await this.RiscoPanel.DiscoverCameras();
+            }*/
+            if ((this.config['Combined'] || 'none') != 'none') {
+                this.log.debug('Combined accessories input/output cannot be used as simple accessories. Remove Them from required accessories');
+                var Combined_Datas = {};
+                var CombId = 0;
+                for (var Comb in this.config['Combined']) {
+                    for (var CombAcc in this.config['Combined'][Comb]) {
+                        const CombInId = this.config['Combined'][Comb][CombAcc].In;
+                        const CombOutId = this.config['Combined'][Comb][CombAcc].Out;
+                        CombId++;
+                        const Detector_Data = Object.values(JSON.parse(JSON.stringify(this.DiscoveredAccessories.Detectors))).filter(detector => (detector.Id == CombInId));
+                        const Output_Data = Object.values(JSON.parse(JSON.stringify(this.DiscoveredAccessories.Outputs))).filter(output => (output.Id == CombOutId));
+                        var Combined_Data = {
+                                    Id: CombId,
+                                    accessorytype: `Combined_${Comb}`,
+                                    InId: Detector_Data[0].Id,
+                                    OutId: Output_Data[0].Id,
+                                    Bypassed: Detector_Data[0].Bypassed,
+                                    Partition: Detector_Data[0].Partition,
+                                    name: Detector_Data[0].name,
+                                    longName: `comb_${CombId}_${((Detector_Data[0].name).toLowerCase()).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ /g, '_')}`,
+                                    InState: Detector_Data[0].State,
+                                    OnAlarm: Detector_Data[0].OnAlarm,
+                                    OutType: Output_Data[0].Type,
+                                    OutState: Output_Data[0].State,
+                                    Required: true
+                        };
+                        this.DiscoveredAccessories.Detectors[Detector_Data[0].Id].Required = false;
+                        this.DiscoveredAccessories.Outputs[Output_Data[0].Id].Required = false;
+                        Combined_Datas[CombId] = Combined_Data;
+                    }
+                }
+                this.DiscoveredAccessories.Combineds = Combined_Datas;
+                this.log.info('Creation of %s Combined Accessories', Object.keys(Combined_Datas).length);
             }
             //fallback to system mode if no DiscoveredAccessories
             if (Object.keys(this.DiscoveredAccessories).length == 0 ) {
                 this.log.debug('Fallback to system mode');
                 this.config['Partition'] = 'system';
-                this.DiscoveredAccessories.partitions = await this.RiscoPanel.DiscoverParts();   
+                this.DiscoveredAccessories.Partitions = await this.RiscoPanel.DiscoverParts();   
             }
             if ((this.config['Custom'] || 'none') != 'none') {
                 this.log.info('Apply Custom Configuration');
@@ -335,7 +500,7 @@ class RiscoPanelPlatform {
                 } else {
                     for (var PartsId in this.DiscoveredAccessories.Partitions) {
                         if (PartsId != 'type') {
-                            if (this.DiscoveredAccessories.Partitions[PartsId].Required == true ) {
+                            if (this.DiscoveredAccessories.Partitions[PartsId].Required == true) {
                                 this.log.info('PreConf Accessory => Configuration for Partitions Id : %s and labeled "%s"', this.DiscoveredAccessories.Partitions[PartsId].Id, this.DiscoveredAccessories.Partitions[PartsId].name);
                                 var PartConfig = {
                                     context: this.DiscoveredAccessories.Partitions[PartsId],
@@ -354,7 +519,7 @@ class RiscoPanelPlatform {
                 this.log.info('Add Accessory => Add Groups');
                 for (var GroupsId in this.DiscoveredAccessories.Groups) {
                     if (GroupsId != 'type') {
-                        if (this.DiscoveredAccessories.Groups[GroupsId].Required == true ) {
+                        if (this.DiscoveredAccessories.Groups[GroupsId].Required == true) {
                             this.log.info('PreConf Accessory => Configuration for Groups Id : %s and labeled "%s"', this.DiscoveredAccessories.Groups[GroupsId].Id, this.DiscoveredAccessories.Groups[GroupsId].name);
                             var GroupConfig = {
                                 context: this.DiscoveredAccessories.Groups[GroupsId],
@@ -370,7 +535,7 @@ class RiscoPanelPlatform {
             case 'Outputs':
                 this.log.info('Add Accessory => Add Outputs');
                 for (var OutputId in this.DiscoveredAccessories.Outputs) {
-                    if (this.DiscoveredAccessories.Outputs[OutputId].Required == true ) {
+                    if (this.DiscoveredAccessories.Outputs[OutputId].Required == true) {
                         this.log.info('PreConf Accessory => Configuration for Outputs Id : %s and labeled "%s"', this.DiscoveredAccessories.Outputs[OutputId].Id, this.DiscoveredAccessories.Outputs[OutputId].name);
                         var OutputConfig = {
                             context: this.DiscoveredAccessories.Outputs[OutputId],
@@ -385,7 +550,7 @@ class RiscoPanelPlatform {
             case 'Detectors':
                 this.log.info('Add Accessory => Add Detectors');
                 for (var DetectorId in this.DiscoveredAccessories.Detectors) {
-                    if (this.DiscoveredAccessories.Detectors[DetectorId].Required == true ) {
+                    if (this.DiscoveredAccessories.Detectors[DetectorId].Required == true) {
                         this.log.info('PreConf Accessory => Configuration for Detectors Id : %s and labeled "%s"', this.DiscoveredAccessories.Detectors[DetectorId].Id, this.DiscoveredAccessories.Detectors[DetectorId].name);
                         var DetectorConfig = {
                             context: this.DiscoveredAccessories.Detectors[DetectorId],
@@ -394,6 +559,21 @@ class RiscoPanelPlatform {
                             pollInterval: this.config['pollInterval']
                         };
                         this.Devices.push(DetectorConfig);
+                    }
+                }
+                break;
+            case 'Combineds':
+                this.log.info('Add Accessory => Add Combined');
+                for (var CombinedId in this.DiscoveredAccessories.Combineds) {
+                    if (this.DiscoveredAccessories.Combineds[CombinedId].Required == true) {
+                        this.log.info('PreConf Accessory => Configuration for Combined Id : %s and labeled "%s"', this.DiscoveredAccessories.Combineds[CombinedId].Id, this.DiscoveredAccessories.Combineds[CombinedId].name);
+                        var CombinedConfig = {
+                            context: this.DiscoveredAccessories.Combineds[CombinedId],
+                            RiscoSession: this.RiscoPanel,
+                            polling: this.config['polling'],
+                            pollInterval: this.config['pollInterval']
+                        };
+                        this.Devices.push(CombinedConfig);
                     }
                 }
                 break;

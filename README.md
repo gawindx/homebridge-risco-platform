@@ -66,6 +66,17 @@ Configuration sample:
                 "Door": "all|0,1,2,....",
                 "Window": "all|0,1,2,....",
                 "Contact Sensor": "all|0,1,2,...."
+            },
+            "Combined": {
+                "Door": [
+                    {"In": "X", "Out": "Y"}
+                ],
+                "Window": [
+                    {"In": "X", "Out": "Y"}
+                ],
+                "GarageDoor": [
+                    {"In": "X", "Out": "Y"}
+                ]
             }
         }
     ]
@@ -73,46 +84,55 @@ Configuration sample:
 
 Fields: 
 
-* "platform" => Mandatory: Must always be "RiscoAlarm" (required) 
+* "platform" => Mandatory: Must always be "RiscoAlarm" (required)
 * "name" => Mandatory: Can be anything (used in logs)
 * "riscoUsername", "riscoPassword" => Mandatory: UserName and Password for you Web interface to RiscoCloud
 * "riscoSiteId"=> Mandatory: This is your siteId to login.
 * "riscoPIN"=> Mandatory: PIN Code used for arm/disarm
 * "polling" => optional: true|false - poll for latest RiscoCloud status (Default to false)
 * "pollInterval" => optional: time in ms for polling (Default to 10000)
+
 * "armCommand": Override default value for arming (default to "armed"). 
     Accept any of this value :
     * "armed" : set Partition/System to "armed"
     * "partially" : set Partition/System to "partially armed" (for example when you stay at home)
     * "disarmed" : set Partition/System to "disarmed"
     *See Notes 1 and 2 below*
+
 * "partialCommand": Override default value for arming (default to "armed").
     Accepts the same values as for "armCommand".
+
 * "homeCommand": Override default value for arming (default to "armed").
     Accepts the same values as for "armCommand".
+
 * "disarmCommand": Override default value for arming (default to "armed").
     Accepts the same values as for "armCommand"
+
 * "Partition" => optional: accept the following options
     * "none": will not generate an accessory for partitions
     * "all": will generate an accessory for each partition
     * "system": will generate an accessory for global system
     * "0,1,...": will generate an accessory for each listed partition.
         Accepts a comma-separated list of string where each member is the id of a partition
+
 * "Groups" => optional: accept the following options
     * "none": will not generate an accessory for Groups
     * "all": will generate an accessory for each Group
     * "0,1,...": will generate an accessory for each listed Groups.
         Accepts a comma-separated list of string where each member is the id of a Group
+
 * "Outputs" => optional: accept the following options
     * "none": will not generate an accessory for Outputs
     * "all": will generate an accessory for each Output
     * "0,1,...": will generate an accessory for each listed Outputs.
         Accepts a comma-separated list of string where each member is the id of a Output
+
 * "Detectors" => optional: accept the following options
     * "none": will not generate an accessory for Detectors
     * "all": will generate an accessory for each Detector
     * "0,1,...": will generate an accessory for each listed Detectors.
         Accepts a comma-separated list of string where each member is the id of a Detector
+
 * "Custom" => optional: Addition of Custom function. accept the following options
     Allows you to modify the type of detector (no distinction between motion detector and another type of detector at the RiscoCloud interface)
     * "Door"=> optional: accept the following options
@@ -130,7 +150,26 @@ Fields:
     * "Vibrate Sensor"=> optional: accept the following options
         * "all": will modify all Detector to Vibrate Sensors.
         * "0,1,...": will modify a list of Detector to Vibrate Sensors.
-        Accepts a comma-separated list of string where each member is the id of a Detecto
+        Accepts a comma-separated list of string where each member is the id of a Detector
+
+* "Combined" => optional: Addition of Combined Accessory.
+    A combined accessory combines both an input and an output (for example, a magnetic contact on a garage door which can be opened / closed via an output of the Control Panel).
+
+    It is important to note that if an input or an output is defined to be part of a Combined Accessory, they will be automatically removed from any other configuration and their old accessories will no longer be usable alone.
+    For reasons of consistency, a bad configuration on a combined element will prevent it from being created.
+    
+    A Combined accessory  accept the following options
+    * "Door"=> Accepts an object list separated by commas chacuns containing an inlet and an outlet
+    * "Window"=> Accepts an object list separated by commas chacuns containing an inlet and an outlet
+    * "GarageDoor"=> Accepts an object list separated by commas chacuns containing an inlet and an outlet
+    
+    For each type of Combined Accessory, it is possible to define several accessories to be created. Exemple :
+    "Door": [
+        {"In": "X1", "Out": "Y1"},
+        {"In": "X2", "Out": "Y2"},
+        {"In": "X3", "Out": "Y3"}
+    ]
+    Where X1, X2 and X3 are each different detector ID numbers and Y1, Y2 and Y3 are each different output ID numbers
 
 *Notes 1 :*
 
@@ -187,9 +226,6 @@ In that case "12345" is your siteId which should be placed in new config file.
 
 
 ## TODO:
-* Allow the ability to monitor panels from multiple sites (only from the same RiscoCloud account) - requires modification of 'app.js' and 'risco.js'
 * Add Cameras (Partially done but may not be usable)
 * Add the ability to define custom detector types - Partially made with the support of "Custom" detectors
 (water / fire / gas / CO2 / temperature threshold detector) as the risco hardware supports. This information does not go back in the interface RiscoCloud, it requires a manual addition.
-* Add a possibility to define a combined element
-example: a detector on a garage door and an output of the panel programmed to remotely open the door that could be combined into a single accessory 'garage door' for both its control and the supervision of its state.

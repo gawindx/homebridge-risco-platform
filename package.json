@@ -1,7 +1,7 @@
 {
   "name": "homebridge-risco-platform",
   "displayName": "Homebridge Risco Platform",
-  "version": "1.1.11",
+  "version": "1.2.0",
   "description": "RiscoAlarm Plugin Platform for Homebridge",
   "homepage": "https://github.com/gawindx/homebridge-risco-platform#readme",
   "license": "ISC",
