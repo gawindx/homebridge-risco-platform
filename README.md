@@ -53,7 +53,6 @@ Configuration sample:
             "riscoPIN": "",
             "polling": true|false,
             "pollInterval": 10000,
-            "Partition_Mode": true|false,
             "armCommand": "armed|partially|disarmed",
             "partialCommand": "armed|partially|disarmed",
             "homeCommand": "armed|partially|disarmed",
