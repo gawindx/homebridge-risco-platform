@@ -51,6 +51,7 @@ Configuration sample:
             "riscoPassword": "",
             "riscoSiteId": 12345,
             "riscoPIN": "",
+            "OccupancyPreventArming": true|false,
             "polling": true|false,
             "pollInterval": 10000,
             "armCommand": "armed|partially|disarmed",
@@ -88,6 +89,7 @@ Fields:
 * "riscoUsername", "riscoPassword" => Mandatory: UserName and Password for you Web interface to RiscoCloud
 * "riscoSiteId"=> Mandatory: This is your siteId to login.
 * "riscoPIN"=> Mandatory: PIN Code used for arm/disarm
+* "OccupancyPreventArming"=> optional: true|false - if set to true, Full or Partial Arming cannot be done if Occupancy is detected (default to true),
 * "polling" => optional: true|false - poll for latest RiscoCloud status (Default to false)
 * "pollInterval" => optional: time in ms for polling (Default to 10000)
 
@@ -227,4 +229,4 @@ In that case "12345" is your siteId which should be placed in new config file.
 ## TODO:
 * Add Cameras (Partially done but may not be usable)
 * Add the ability to define custom detector types - Partially made with the support of "Custom" detectors
-(water / fire / gas / CO2 / temperature threshold detector) as the risco hardware supports. This information does not go back in the interface RiscoCloud, it requires a manual addition.
+(water / fire / gas / CO2 / temperature threshold detector) as the risco hardware supports. This information does not go back in the REST API iRisco, it requires a manual addition (Also requires that the hardware configuration of the entry be considered as a detection area, otherwise the entry will not be accessible via the Risco APIs)

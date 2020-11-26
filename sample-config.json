@@ -9,6 +9,7 @@
             "riscoPassword": "",
             "riscoSiteId": 12345,
             "riscoPIN": "",
+            "OccupancyPreventArming": true|false,
             "Partition_Mode": true|false,
             "armCommand": "armed|partially|disarmed",
             "partialCommand": "armed|partially|disarmed",

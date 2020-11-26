@@ -2,11 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 
-## 1.2.0 (2020-15-11)
+## 1.2.0 (2020-26-11)
 
+* **Abandonment of the RiscoCloud web interface in favor of the iRisco REST API for the connection and recovery of system information.
+  Benefits brought by this change:**
+  * Faster data processing.
+  * Less data consumption.
+  * Faster system status update (not always true for detector status).
+  * The information necessary for future camera support is provided by the iRisco REST API
+* The code concerning the functionalities linked to the occupancy sensor has been revised and it is also possible to deactivate its operation via a new 
+  configuration option (OccupancyPreventArming). This option is enabled by default.
+* Additional information in the case of missing credentials preventing the initialization of the connection to RiscoCloud.
+* Additional information in the event of a connection error caused by the wrong identifier for connecting to RiscoCloud.
+* Correction of an error causing the appearance / disappearance of the 'Security System' accessory in System Partitions mode from one boot to another
 * Added functionality for combined elements (Door, Window and Garage Door are supported)
-* The functionality used to prevent the commissioning of an occupied partition was suspended until a better solution was implemented (could lead to an inability to arm).
 * Improved management and error detection during http requests to RiscoCloud and the appearance of a 500 error.
+
+* **Known issues:**
+  * The state of an accessory can sometimes take a second or two to set its final state (for example, in the case of arming a partition, the state can revert to 'deactivate' for a second or two before to take the final armed state.
+  This problem does not prevent operation and will be corrected in a future version.
+  * When you change the type of a combined accessory, it can sometimes happen that the icon becomes that of a switch.
+  This problem is due to the fact that the exclusion function becomes the main Service.
+  This problem does not affect the correct operation and a solution will be provided on a future update.
+
+
 
 ## 1.1.11 (2020-11-01)
 
