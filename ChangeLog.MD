@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## 1.2.0 (2020-26-11)
+## 1.2.0 (2020-28-11)
 
 * **Abandonment of the RiscoCloud web interface in favor of the iRisco REST API for the connection and recovery of system information.
   Benefits brought by this change:**

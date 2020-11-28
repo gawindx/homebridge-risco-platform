@@ -1,12 +1,11 @@
 var axios = require('axios');
 var pollingtoevent = require('polling-to-event');
-var iRiscoUserAgent = 'iRISCO/0002 CFNetwork/1197 Darwin/20.0.0';
-
-function extractError(aBody) {
-    var serverInfo_begin = aBody.indexOf("<span class=\"infoServer\">");
-    var serverInfo_end = aBody.indexOf("</span>", serverInfo_begin);
-    return aBody.substring(serverInfo_begin + 26, serverInfo_end - 7);
-}
+const iRiscoUserAgent = 'iRISCO/0002 CFNetwork/1197 Darwin/20.0.0';
+const CommonNetError = {
+    'EAI_AGAIN': 'DNS Lookup Error. Verify your Internet Connection!!!',
+    'ETIMEDOUT': 'Request Timeout. If this persist, Verify your Internet Connection!!!',
+    'ENETUNREACH': 'Network Unreachable. Verify your Internet Connection!!!'
+};
 
 class RiscoPanelSession {
     constructor(aConfig, aLog, api) {
@@ -153,10 +152,13 @@ class RiscoPanelSession {
                 })
                 .catch( error => {
                     if (error.response){
-                        return Promise.reject(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
+                        self.log.error(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
+                    } else if (CommonNetError[error.errno] !== undefined){
+                        self.log.error(CommonNetError[error.errno]);
                     } else {
-                        return Promise.reject(`Error on Request : ${error.errno}\n Code : ${error.code}`);
+                        self.log.error(`Error on Request : ${error.errno}\n Code : ${error.code}`);
                     }
+                    return false;
                 });
                 if ((response.status == 200) && (response.statusText == 'OK')) {
                     if (response.data.status > 400) {
@@ -213,11 +215,13 @@ class RiscoPanelSession {
             })
             .catch( error => {
                 if (error.response){
-                    return Promise.reject(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
+                    self.log.error(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
+                } else if (CommonNetError[error.errno] !== undefined){
+                    self.log.error(CommonNetError[error.errno]);
                 } else {
-                    //throw new Error(`Error on Request : ${error.errno}\n Code : ${error.code}`);
-                    return Promise.reject(`Error on Request : ${error.errno}`);
+                    self.log.error(`Error on Request : ${error.errno}\n Code : ${error.code}`);
                 }
+                return false;
             });
             if ((response.status == 200) && (response.statusText == 'OK')) {
                 if (response.data.status > 400) {
@@ -984,8 +988,8 @@ class RiscoPanelSession {
                 .catch( error => {
                     if (error.response){
                         self.log.error(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
-                    } else if (error.errno.indexOf('EAI_AGAIN') != -1) {
-                        self.log.error('DNS Lookup Error. Verify your Internet Connection!!!');
+                    } else if (CommonNetError[error.errno] !== undefined){
+                        self.log.error(CommonNetError[error.errno]);
                     } else {
                         self.log.error(`Error on Request : ${error.errno}\n Code : ${error.code}`);
                     }
@@ -1011,8 +1015,8 @@ class RiscoPanelSession {
                 .catch( error => {
                     if (error.response) {
                         self.log.error(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
-                    } else if (error.errno.indexOf('EAI_AGAIN') != -1) {
-                        self.log.error('DNS Lookup Error. Verify your Internet Connection!!!');
+                    } else if (CommonNetError[error.errno] !== undefined){
+                        self.log.error(CommonNetError[error.errno]);
                     } else {
                         self.log.error(`Error on Request : ${error.errno}\n Code : ${error.code}`);
                     }
@@ -1079,7 +1083,7 @@ class RiscoPanelSession {
                     if ((this.config['Cameras'] || 'none') != 'none') {
                         await self.getPartsStates();
                     }*/
-                    await self.getAlarmState(PanelsDatas);
+                    if (PanelsDatas.Partitions != null) { await self.getAlarmState(PanelsDatas); }
                 }
                 self.log.debug('Leaving UpdateCPStates function');
             }
@@ -1147,10 +1151,13 @@ class RiscoPanelSession {
                 })
                 .catch( error => {
                     if (error.response){
-                        return Promise.reject(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
+                        self.log.error(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
+                    } else if (CommonNetError[error.errno] !== undefined){
+                        self.log.error(CommonNetError[error.errno]);
                     } else {
-                        return Promise.reject(`Error on Request : ${error.errno}\n Code : ${error.code}`);
+                        self.log.error(`Error on Request : ${error.errno}\n Code : ${error.code}`);
                     }
+                    return [0, NaN];
                 });
                 if (response.data.status == 200) {
                     //self.log.error('response arm: %s', JSON.Stringify(response.data))
@@ -1237,10 +1244,13 @@ class RiscoPanelSession {
                 })
                 .catch( error => {
                     if (error.response){
-                        return Promise.reject(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
+                        self.log.error(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
+                    } else if (CommonNetError[error.errno] !== undefined){
+                        self.log.error(CommonNetError[error.errno]);
                     } else {
-                        return Promise.reject(`Error on Request : ${error.errno}\n Code : ${error.code}`);
+                        self.log.error(`Error on Request : ${error.errno}\n Code : ${error.code}`);
                     }
+                    return false;
                 });
                 if ( (response.data.status == 200) && (response.data.response !== null)){
                     self.log.debug('OutputCommand Ok. Using this result for status update');
@@ -1287,10 +1297,13 @@ class RiscoPanelSession {
                 })
                 .catch( error => {
                     if (error.response){
-                        return Promise.reject(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
+                        self.log.error(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
+                    } else if (CommonNetError[error.errno] !== undefined){
+                        self.log.error(CommonNetError[error.errno]);
                     } else {
-                        return Promise.reject(`Error on Request : ${error.errno}\n Code : ${error.code}`);
+                        self.log.error(`Error on Request : ${error.errno}\n Code : ${error.code}`);
                     }
+                    return false;
                 });
                 if (response.data.status == 200) {
                     self.log.debug('SetBypass Ok. Using this result for status update');
