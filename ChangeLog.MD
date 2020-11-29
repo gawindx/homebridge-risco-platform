@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.2.1 (2020-29-11)
+
+* Fix an error occured when no Detectors was configured
+
 ## 1.2.0 (2020-28-11)
 
 * **Abandonment of the RiscoCloud web interface in favor of the iRisco REST API for the connection and recovery of system information.

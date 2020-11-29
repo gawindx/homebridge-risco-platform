@@ -4,7 +4,8 @@ const iRiscoUserAgent = 'iRISCO/0002 CFNetwork/1197 Darwin/20.0.0';
 const CommonNetError = {
     'EAI_AGAIN': 'DNS Lookup Error. Verify your Internet Connection!!!',
     'ETIMEDOUT': 'Request Timeout. If this persist, Verify your Internet Connection!!!',
-    'ENETUNREACH': 'Network Unreachable. Verify your Internet Connection!!!'
+    'ENETUNREACH': 'Network Unreachable. Verify your Internet Connection!!!',
+    'ENOTFOUND': 'DNS Hostname Not Found. Verify your Internet Connection!!!'
 };
 
 class RiscoPanelSession {
@@ -771,21 +772,23 @@ class RiscoPanelSession {
                 //Init Occupancy State Before Processing
                 self.DiscoveredAccessories.Partitions[0].Ready = true;
                 self.DiscoveredAccessories.Partitions[0].PReady = true;
-                const OpenedSensor = Object.values(self.DiscoveredAccessories.Detectors)
-                    .filter( detector => ((detector.State === true) && (detector.Bypassed === false)));
-                if (Object.keys(OpenedSensor).length > 0) {
-                    self.DiscoveredAccessories.Partitions[0].Ready = false;
-                    self.log.debug('Motion Is Detected, set System to Occupied');
-                    if (Object.keys(Object.values(OpenedSensor)
-                        .filter(detector => detector.accessorytype != 'Detector')).length > 0) {
-                        self.DiscoveredAccessories.Partitions[0].PReady = false;
+                if (self.DiscoveredAccessories.Detectors !== undefined) {
+                    const OpenedSensor = Object.values(self.DiscoveredAccessories.Detectors)
+                        .filter( detector => ((detector.State === true) && (detector.Bypassed === false)));
+                    if (Object.keys(OpenedSensor).length > 0) {
+                        self.DiscoveredAccessories.Partitions[0].Ready = false;
+                        self.log.debug('Motion Is Detected, set System to Occupied');
+                        if (Object.keys(Object.values(OpenedSensor)
+                            .filter(detector => detector.accessorytype != 'Detector')).length > 0) {
+                            self.DiscoveredAccessories.Partitions[0].PReady = false;
+                        } else {
+                            self.DiscoveredAccessories.Partitions[0].PReady = ((self.DiscoveredAccessories.Partitions[0].PReady) ? true : false );
+                        }
                     } else {
+                        self.DiscoveredAccessories.Partitions[0].Ready = ((self.DiscoveredAccessories.Partitions[0].Ready) ? true : false );
                         self.DiscoveredAccessories.Partitions[0].PReady = ((self.DiscoveredAccessories.Partitions[0].PReady) ? true : false );
+                        self.log.debug('Motion Is Not Detected, set System to Not Occupied');
                     }
-                } else {
-                    self.DiscoveredAccessories.Partitions[0].Ready = ((self.DiscoveredAccessories.Partitions[0].Ready) ? true : false );
-                    self.DiscoveredAccessories.Partitions[0].PReady = ((self.DiscoveredAccessories.Partitions[0].PReady) ? true : false );
-                    self.log.debug('Motion Is Not Detected, set System to Not Occupied');
                 }
             } else {
                 self.log.debug('Partition Mode');
@@ -804,26 +807,28 @@ class RiscoPanelSession {
                                 //Init Occupancy State Before Processing
                                 self.DiscoveredAccessories.Partitions[partition.Id].Ready = true;
                                 self.DiscoveredAccessories.Partitions[partition.Id].PReady = true;
-                                const OpenedSensor = Object.values(self.DiscoveredAccessories.Detectors)
-                                    .filter( detector => ( 
-                                        (Object.values(detector.Partition)
-                                            .some(parentpart => (parentpart == partition.Id))
-                                        && (detector.State === true)
-                                        && (detector.Bypassed === false)))
-                                    );
-                                if (Object.keys(OpenedSensor).length > 0) {
-                                    self.DiscoveredAccessories.Partitions[partition.Id].Ready = false;
-                                    self.log.debug('Motion Is Detected, set System to Occupied');
-                                    if (Object.keys(Object.values(OpenedSensor)
-                                        .filter( detector => (detector.accessorytype != 'Detector'))).length > 0) {
-                                            self.DiscoveredAccessories.Partitions[partition.Id].PReady = false;
+                                if (self.DiscoveredAccessories.Detectors !== undefined) {
+                                    const OpenedSensor = Object.values(self.DiscoveredAccessories.Detectors)
+                                        .filter( detector => ( 
+                                            (Object.values(detector.Partition)
+                                                .some(parentpart => (parentpart == partition.Id))
+                                            && (detector.State === true)
+                                            && (detector.Bypassed === false)))
+                                        );
+                                    if (Object.keys(OpenedSensor).length > 0) {
+                                        self.DiscoveredAccessories.Partitions[partition.Id].Ready = false;
+                                        self.log.debug('Motion Is Detected, set System to Occupied');
+                                        if (Object.keys(Object.values(OpenedSensor)
+                                            .filter( detector => (detector.accessorytype != 'Detector'))).length > 0) {
+                                                self.DiscoveredAccessories.Partitions[partition.Id].PReady = false;
+                                        } else {
+                                            self.DiscoveredAccessories.Partitions[partition.Id].PReady = ((self.DiscoveredAccessories.Partitions[partition.Id].PReady) ? true : false );
+                                        }
                                     } else {
+                                        self.DiscoveredAccessories.Partitions[partition.Id].Ready = ((self.DiscoveredAccessories.Partitions[partition.Id].Ready) ? true : false );
                                         self.DiscoveredAccessories.Partitions[partition.Id].PReady = ((self.DiscoveredAccessories.Partitions[partition.Id].PReady) ? true : false );
+                                        self.log.debug('Motion Is Not Detected, set System to Not Occupied');
                                     }
-                                } else {
-                                    self.DiscoveredAccessories.Partitions[partition.Id].Ready = ((self.DiscoveredAccessories.Partitions[partition.Id].Ready) ? true : false );
-                                    self.DiscoveredAccessories.Partitions[partition.Id].PReady = ((self.DiscoveredAccessories.Partitions[partition.Id].PReady) ? true : false );
-                                    self.log.debug('Motion Is Not Detected, set System to Not Occupied');
                                 }
                             }
                         });
