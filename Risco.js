@@ -156,12 +156,15 @@ class RiscoPanelSession {
                         self.log.error(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
                     } else if (CommonNetError[error.errno] !== undefined){
                         self.log.error(CommonNetError[error.errno]);
+                    } else if (CommonNetError[error.code] !== undefined) {
+                        self.log.error(CommonNetError[error.code]);
                     } else {
                         self.log.error(`Error on Request : ${error.errno}\n Code : ${error.code}`);
                     }
+                    setTimeout( () => { self.SessionValidity(); }, 5000);
                     return false;
                 });
-                if ((response.status == 200) && (response.statusText == 'OK')) {
+                if ((response.status !== undefined) && (response.status == 200) && (response.statusText == 'OK')) {
                     if (response.data.status > 400) {
                         self.log.error(`Error ${response.data.status}\n${response.data.errorText}`);
                         return false;
@@ -187,6 +190,7 @@ class RiscoPanelSession {
             self.refreshToken = '';
             self.renewToken = '';
             self.SessionRenew = '';
+            setTimeout( () => { self.SessionValidity(); }, 5000);
             return false;
         }
     }
@@ -219,12 +223,15 @@ class RiscoPanelSession {
                     self.log.error(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
                 } else if (CommonNetError[error.errno] !== undefined){
                     self.log.error(CommonNetError[error.errno]);
+                } else if (CommonNetError[error.code] !== undefined) {
+                        self.log.error(CommonNetError[error.code]);
                 } else {
                     self.log.error(`Error on Request : ${error.errno}\n Code : ${error.code}`);
                 }
+                setTimeout( () => { self.SessionValidity(); }, 5000);
                 return false;
             });
-            if ((response.status == 200) && (response.statusText == 'OK')) {
+            if ((response.status !== undefined) && (response.status == 200) && (response.statusText == 'OK')) {
                 if (response.data.status > 400) {
                     if (response.data.status == 401) {
                         return await self.Login();
@@ -251,6 +258,7 @@ class RiscoPanelSession {
             self.refreshToken = '';
             self.renewToken = '';
             self.SessionRenew = '';
+            setTimeout( () => { self.SessionValidity(); }, 5000);
             return false;
         }
     }
@@ -993,8 +1001,10 @@ class RiscoPanelSession {
                 .catch( error => {
                     if (error.response){
                         self.log.error(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
-                    } else if (CommonNetError[error.errno] !== undefined){
+                    } else if (CommonNetError[error.errno] !== undefined) {
                         self.log.error(CommonNetError[error.errno]);
+                    } else if (CommonNetError[error.code] !== undefined) {
+                        self.log.error(CommonNetError[error.code]);
                     } else {
                         self.log.error(`Error on Request : ${error.errno}\n Code : ${error.code}`);
                     }
@@ -1022,6 +1032,8 @@ class RiscoPanelSession {
                         self.log.error(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
                     } else if (CommonNetError[error.errno] !== undefined){
                         self.log.error(CommonNetError[error.errno]);
+                    } else if (CommonNetError[error.code] !== undefined) {
+                        self.log.error(CommonNetError[error.code]);
                     } else {
                         self.log.error(`Error on Request : ${error.errno}\n Code : ${error.code}`);
                     }
@@ -1159,6 +1171,8 @@ class RiscoPanelSession {
                         self.log.error(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
                     } else if (CommonNetError[error.errno] !== undefined){
                         self.log.error(CommonNetError[error.errno]);
+                    } else if (CommonNetError[error.code] !== undefined) {
+                        self.log.error(CommonNetError[error.code]);
                     } else {
                         self.log.error(`Error on Request : ${error.errno}\n Code : ${error.code}`);
                     }
@@ -1252,6 +1266,8 @@ class RiscoPanelSession {
                         self.log.error(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
                     } else if (CommonNetError[error.errno] !== undefined){
                         self.log.error(CommonNetError[error.errno]);
+                    } else if (CommonNetError[error.code] !== undefined) {
+                        self.log.error(CommonNetError[error.code]);
                     } else {
                         self.log.error(`Error on Request : ${error.errno}\n Code : ${error.code}`);
                     }
@@ -1305,6 +1321,8 @@ class RiscoPanelSession {
                         self.log.error(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
                     } else if (CommonNetError[error.errno] !== undefined){
                         self.log.error(CommonNetError[error.errno]);
+                    } else if (CommonNetError[error.code] !== undefined) {
+                        self.log.error(CommonNetError[error.code]);
                     } else {
                         self.log.error(`Error on Request : ${error.errno}\n Code : ${error.code}`);
                     }

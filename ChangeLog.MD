@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.2.2 (2020-02-12)
+* Modifying *_addOrConfigure* function to avoid issue #30
+* Improvement of the Risco Cloud connection procedure in the event of a persistent network error
+
 ## 1.2.1 (2020-29-11)
 
 * Fix an error occured when no Detectors was configured

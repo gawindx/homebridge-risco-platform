@@ -185,11 +185,15 @@ class RiscoPanelPlatform {
         if (type !== object.context.accessorytype) {
             this.log.debug('Accessory: %s Modified Since Last Run', object.context.name);
             add = true;
-            accessory.removeService(accessory.getService(this.Custom_Types_Services[type]));
+            if (this.Custom_Types.includes(type)) {
+                accessory.removeService(accessory.getService(this.Custom_Types_Services[type]));
+            } else if (this.Combined_Types.includes(type)) {
+                accessory.removeService(accessory.getService(this.Combined_Types_Services[type]));
+            }
             accessory.context.accessorytype = type = object.context.accessorytype;
         }
 
-        if (add) {
+        if ((add) ||  (accessory.getService(Service.AccessoryInformation) === undefined)) {
             this.log.debug('AddOrConfigure Accessory: %s', object.context.name);
             accessory.getService(Service.AccessoryInformation)
                 .setCharacteristic(Characteristic.Name, object.context.name)
