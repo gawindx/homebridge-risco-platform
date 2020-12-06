@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.2.3 (2020-06-12)
+* Fix an error on the occupancy sensor which generates an initialization error when no Detector is defined (#30 and #31)
+* Added a function to prevent Circular JSON definition error (#31). This error seems to be present when using a version of Homebridge = 1.1.6
+* Code improvement for handling network errors
+* Changed minimum values for homebridge and node.js in the npm definition
+
 ## 1.2.2 (2020-02-12)
 * Modifying *_addOrConfigure* function to avoid issue #30
 * Improvement of the Risco Cloud connection procedure in the event of a persistent network error

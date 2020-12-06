@@ -8,6 +8,41 @@ const CommonNetError = {
     'ENOTFOUND': 'DNS Hostname Not Found. Verify your Internet Connection!!!'
 };
 
+const JSONreplacer = () => {
+    const visited = new WeakSet();
+    return (key, value) => {
+        if (typeof value === 'object' && value !== null) {
+            if (visited.has(value)) {
+                return;
+            }
+            visited.add(value);
+        }
+        return value;
+    };
+};
+
+const NetworkErrorMsg = (error) => {
+    const CommonNetError = {
+        'EAI_AGAIN': 'DNS Lookup Error. Verify your Internet Connection!!!',
+        'ETIMEDOUT': 'Request Timeout. If this persist, Verify your Internet Connection!!!',
+        'ENETUNREACH': 'Network Unreachable. Verify your Internet Connection!!!',
+        'ENOTFOUND': 'DNS Hostname Not Found. Verify your Internet Connection!!!'
+    };
+    if (error.response) {
+        if (error.response.status >= 500) {
+            return 'Connection problem due to an error from the RiscoCloud servers.';
+        } else {
+            return `Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`;
+        }
+    } else if (CommonNetError[error.errno] !== undefined){
+        return CommonNetError[error.errno];
+    } else if (CommonNetError[error.code] !== undefined) {
+        return CommonNetError[error.code];
+    } else {
+        return `Error on Request : ${error.errno}\n Code : ${error.code}`;
+    }
+}
+
 class RiscoPanelSession {
     constructor(aConfig, aLog, api) {
         // Do not create new object if already exist
@@ -152,15 +187,7 @@ class RiscoPanelSession {
                     maxRedirects: 0,
                 })
                 .catch( error => {
-                    if (error.response){
-                        self.log.error(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
-                    } else if (CommonNetError[error.errno] !== undefined){
-                        self.log.error(CommonNetError[error.errno]);
-                    } else if (CommonNetError[error.code] !== undefined) {
-                        self.log.error(CommonNetError[error.code]);
-                    } else {
-                        self.log.error(`Error on Request : ${error.errno}\n Code : ${error.code}`);
-                    }
+                    self.log.error(NetworkErrorMsg(error));
                     setTimeout( () => { self.SessionValidity(); }, 5000);
                     return false;
                 });
@@ -219,15 +246,7 @@ class RiscoPanelSession {
                 maxRedirects: 0,
             })
             .catch( error => {
-                if (error.response){
-                    self.log.error(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
-                } else if (CommonNetError[error.errno] !== undefined){
-                    self.log.error(CommonNetError[error.errno]);
-                } else if (CommonNetError[error.code] !== undefined) {
-                        self.log.error(CommonNetError[error.code]);
-                } else {
-                    self.log.error(`Error on Request : ${error.errno}\n Code : ${error.code}`);
-                }
+                self.log.error(NetworkErrorMsg(error));
                 setTimeout( () => { self.SessionValidity(); }, 5000);
                 return false;
             });
@@ -448,7 +467,7 @@ class RiscoPanelSession {
                         });
                 }
                 self.log.info('Discovered %s Groups', (Object.keys(Groups_Datas).length));
-                self.log.debug(JSON.stringify(Groups_Datas, null, 4));
+                self.log.debug(JSON.stringify(Groups_Datas, JSONreplacer(), 4));
                 return Groups_Datas;
             })();
             return GroupInfos;
@@ -516,7 +535,7 @@ class RiscoPanelSession {
                     Outputs_Datas[Output_Data.Id] = Output_Data;
                 }
                 self.log.info('Discovered %s Outputs', (Object.keys(Outputs_Datas).length));
-                self.log.debug(JSON.stringify(Outputs_Datas, null, 4));
+                self.log.debug(JSON.stringify(Outputs_Datas, JSONreplacer(), 4));
                 return Outputs_Datas;
             })();
             return OutputInfo;
@@ -999,15 +1018,7 @@ class RiscoPanelSession {
                     maxRedirects: 0,
                 })
                 .catch( error => {
-                    if (error.response){
-                        self.log.error(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
-                    } else if (CommonNetError[error.errno] !== undefined) {
-                        self.log.error(CommonNetError[error.errno]);
-                    } else if (CommonNetError[error.code] !== undefined) {
-                        self.log.error(CommonNetError[error.code]);
-                    } else {
-                        self.log.error(`Error on Request : ${error.errno}\n Code : ${error.code}`);
-                    }
+                    self.log.error(NetworkErrorMsg(error));
                     return PanelDatas;
                 });
 
@@ -1028,15 +1039,7 @@ class RiscoPanelSession {
                     maxRedirects: 0,
                 })
                 .catch( error => {
-                    if (error.response) {
-                        self.log.error(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
-                    } else if (CommonNetError[error.errno] !== undefined){
-                        self.log.error(CommonNetError[error.errno]);
-                    } else if (CommonNetError[error.code] !== undefined) {
-                        self.log.error(CommonNetError[error.code]);
-                    } else {
-                        self.log.error(`Error on Request : ${error.errno}\n Code : ${error.code}`);
-                    }
+                    self.log.error(NetworkErrorMsg(error));
                     return PanelDatas;
                 });
                 if ((responsePanel.status == 200) && (responsePanel.statusText == 'OK') 
@@ -1167,15 +1170,7 @@ class RiscoPanelSession {
                     maxRedirects: 0,
                 })
                 .catch( error => {
-                    if (error.response){
-                        self.log.error(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
-                    } else if (CommonNetError[error.errno] !== undefined){
-                        self.log.error(CommonNetError[error.errno]);
-                    } else if (CommonNetError[error.code] !== undefined) {
-                        self.log.error(CommonNetError[error.code]);
-                    } else {
-                        self.log.error(`Error on Request : ${error.errno}\n Code : ${error.code}`);
-                    }
+                    self.log.error(NetworkErrorMsg(error));
                     return [0, NaN];
                 });
                 if (response.data.status == 200) {
@@ -1262,15 +1257,7 @@ class RiscoPanelSession {
                     maxRedirects: 0,
                 })
                 .catch( error => {
-                    if (error.response){
-                        self.log.error(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
-                    } else if (CommonNetError[error.errno] !== undefined){
-                        self.log.error(CommonNetError[error.errno]);
-                    } else if (CommonNetError[error.code] !== undefined) {
-                        self.log.error(CommonNetError[error.code]);
-                    } else {
-                        self.log.error(`Error on Request : ${error.errno}\n Code : ${error.code}`);
-                    }
+                    self.log.error(NetworkErrorMsg(error));
                     return false;
                 });
                 if ( (response.data.status == 200) && (response.data.response !== null)){
@@ -1317,15 +1304,7 @@ class RiscoPanelSession {
                     maxRedirects: 0,
                 })
                 .catch( error => {
-                    if (error.response){
-                        self.log.error(`Bad HTTP Response: ${error.response.status}\nData: ${error.response.data}`);
-                    } else if (CommonNetError[error.errno] !== undefined){
-                        self.log.error(CommonNetError[error.errno]);
-                    } else if (CommonNetError[error.code] !== undefined) {
-                        self.log.error(CommonNetError[error.code]);
-                    } else {
-                        self.log.error(`Error on Request : ${error.errno}\n Code : ${error.code}`);
-                    }
+                    self.log.error(NetworkErrorMsg(error));
                     return false;
                 });
                 if (response.data.status == 200) {

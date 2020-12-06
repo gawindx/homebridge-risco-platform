@@ -3,6 +3,20 @@ var pjson = require('./package.json');
 var waitUntil = require('wait-until');
 var pollingtoevent = require('polling-to-event');
 
+const JSONreplacer = () => {
+    const visited = new WeakSet();
+    return (key, value) => {
+        if (typeof value === 'object' && value !== null) {
+            if (visited.has(value)) {
+                return;
+            }
+            visited.add(value);
+        }
+        return value;
+    };
+};
+
+
 class RiscoCPPartitions {
     constructor(log, accConfig, api, accessory, TypeOfAcc = 'partition') {
         this.log = log;
@@ -175,7 +189,7 @@ class RiscoCPPartitions {
                     if ((state == 3) && (self.riscoCurrentState != 3)) {
                         self.log.debug('The system is armed and you want to disarm. Because RiscoCloud can not afford it, it is necessary to disarm the parent(s) partition.');
                         self.log.debug('All other child groups in this partition will also be disarmed.');
-                        self.log.debug('Parent Part of %s: %s', (self.RiscoPartId || 'null'), JSON.stringify((self.RiscoSession.DiscoveredAccessories.Groups[self.RiscoPartId]).parentPart, null, 4));
+                        self.log.debug('Parent Part of %s: %s', (self.RiscoPartId || 'null'), JSON.stringify((self.RiscoSession.DiscoveredAccessories.Groups[self.RiscoPartId]).parentPart, JSONreplacer(), 4));
                         armedState = ArmedValues['disarmed'];
                     } else {
                         self.log.debug('Add Cmd: "%sG%s:armed"', self.RiscoPartId);

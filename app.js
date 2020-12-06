@@ -12,6 +12,19 @@ const platformName = 'RiscoAlarm';
 let hap;
 let Service, Characteristic, UUIDGen;
 
+const JSONreplacer = () => {
+    const visited = new WeakSet();
+    return (key, value) => {
+        if (typeof value === 'object' && value !== null) {
+            if (visited.has(value)) {
+                return;
+            }
+            visited.add(value);
+        }
+        return value;
+    };
+};
+
 class RiscoPanelPlatform {
     constructor(log, config, api) {
         //Types of Custom Detector
@@ -97,7 +110,7 @@ class RiscoPanelPlatform {
                     .catch( e => {
                         this.log.error('Error on Discovery Phase : %s',e);
                     });
-                this.log.debug('Discovered Accessories:\n%s', JSON.stringify(this.DiscoveredAccessories, null, 4));
+                this.log.debug('Discovered Accessories:\n%s', JSON.stringify(this.DiscoveredAccessories, JSONreplacer(), 4));
                 this.log.info('PreConf Phase Started');
                 try {
                     if (Object.keys(this.DiscoveredAccessories).length != 0) {
@@ -109,10 +122,10 @@ class RiscoPanelPlatform {
                 } catch (err) {
                     this.log.error('Error on PreConf Phase: %s', err);
                 }
-                this.log.debug('PreConfigured Accessories:\n%s', JSON.stringify(this.DiscoveredAccessories, null, 4));
+                this.log.debug('PreConfigured Accessories:\n%s', JSON.stringify(this.DiscoveredAccessories, JSONreplacer(), 4));
                 this.log.info('PreConf Phase Ended');
                 this.log.info('Create Accessory Phase Started');
-                this.log.debug('Devices:\n%s', JSON.stringify(this.Devices, null, 4));
+                this.log.debug('Devices:\n%s', JSON.stringify(this.Devices, JSONreplacer(), 4));
                 try {
                     if (Object.keys(this.DiscoveredAccessories).length != 0) {
                         if (this.hasCachedAccessory) {
@@ -153,7 +166,7 @@ class RiscoPanelPlatform {
             this.log.info('Restoring or Set Removing accessory %s', accessory.displayName);
             this.Devices.filter(new_device => ((new_device.context.longName == accessory.context.longName) && (new_device.context.Required == true)))
                 .map(new_device => {
-                    self.log.debug('Device to reconfigure:\n%s',JSON.stringify(new_device, null, 4));
+                    self.log.debug('Device to reconfigure:\n%s',JSON.stringify(new_device, JSONreplacer(), 4));
                     self._addOrConfigure(accessory, new_device, accessory.context.accessorytype, false);
                     KeepAccessory = true;
                 });
@@ -173,7 +186,7 @@ class RiscoPanelPlatform {
         let accessory = new this.api.platformAccessory(DiscoveredAcc.context.name, uuid);
         accessory.context = DiscoveredAcc.context;
         if ((this.accessories.filter(device => (device.UUID == uuid))).length == 0) {
-            this.log.debug('PreConfigured Accessories To configure:\n%s', JSON.stringify(DiscoveredAcc, null, 4));
+            this.log.debug('PreConfigured Accessories To configure:\n%s', JSON.stringify(DiscoveredAcc, JSONreplacer(), 4));
             this.log.info('Adding new accessory with Name: %s, Id: %s, type: %s', DiscoveredAcc.context.name, DiscoveredAcc.context.Id, DiscoveredAcc.context.accessorytype);
             this._addOrConfigure(accessory, DiscoveredAcc, DiscoveredAcc.context.accessorytype, true);
             this.accessories.push(accessory);
@@ -216,7 +229,7 @@ class RiscoPanelPlatform {
             case 'Partitions':
                 if (add) {
                     accessory.addService(Service.SecuritySystem, accessory.context.name);
-                    if (object.Occupancy) {
+                    if (this.config['OccupancyPreventArming'] || true) {
                         accessory.addService(Service.OccupancySensor, `Occupancy ${accessory.displayName}`, `occupancy_${accessory.context.name}`);
                     }
                 } else {
@@ -224,11 +237,13 @@ class RiscoPanelPlatform {
                     if (object.Occupancy) {
                         if (accessory.getService(Service.OccupancySensor) == undefined ){
                             this.log.debug('Occupancy Service not already defined on accessory %s', accessory.displayName);
+                            this.log.error('Occupancy Service not already defined on accessory %s', accessory.displayName);
                             accessory.addService(Service.OccupancySensor, `Occupancy ${accessory.displayName}`, `occupancy_${accessory.context.name}`);
                         }
-                    } else {
+                    } else if (!(this.config['OccupancyPreventArming'] || true )) {
                         if (accessory.getService(Service.OccupancySensor) != undefined ){
                             this.log.debug('Occupancy Service Defined but not needed on accessory %s', accessory.displayName);
+                            this.log.error('Occupancy Service Defined but not needed on accessory %s', accessory.displayName);
                             accessory.removeService(Service.OccupancySensor);
                         }
                     }
@@ -484,7 +499,7 @@ class RiscoPanelPlatform {
                             const Modified_Detectors = this.config['Custom'][this.Custom_Types[Custom_Type]].split(',').map(function(item) {
                                 return parseInt(item, 10);
                             });
-                            this.log.debug('Modified Detectors:\n%s', JSON.stringify(Modified_Detectors, null, 4));
+                            this.log.debug('Modified Detectors:\n%s', JSON.stringify(Modified_Detectors, JSONreplacer(), 4));
                             for (var Id_Detector in Modified_Detectors) {
                                 this.log.debug('Detector Name/Id: %s/%s Modified to %s', this.DiscoveredAccessories.Detectors[Modified_Detectors[Id_Detector]].name, this.DiscoveredAccessories.Detectors[Modified_Detectors[Id_Detector]].Id, this.Custom_Types[Custom_Type]);
                                 this.DiscoveredAccessories.Detectors[Modified_Detectors[Id_Detector]].accessorytype = this.Custom_Types[Custom_Type];
@@ -518,7 +533,7 @@ class RiscoPanelPlatform {
                         RiscoSession: this.RiscoPanel,
                         polling: this.config['polling'],
                         pollInterval: this.config['pollInterval'],
-                        Occupancy: ((this.DiscoveredAccessories.Detectors != undefined) ? true : false)
+                        OccupancyPreventArming: ((this.DiscoveredAccessories.Detectors != undefined) ? (this.config['OccupancyPreventArming'] || true) : false)
                     };
                     this.Devices.push(PartConfig);
                 } else {
@@ -531,7 +546,7 @@ class RiscoPanelPlatform {
                                     RiscoSession: this.RiscoPanel,
                                     polling: this.config['polling'],
                                     pollInterval: this.config['pollInterval'],
-                                    Occupancy: ((this.DiscoveredAccessories.Detectors != undefined) ? true : false)
+                                    OccupancyPreventArming: ((this.DiscoveredAccessories.Detectors != undefined) ? (this.config['OccupancyPreventArming'] || true) : false)
                                 };
                                 this.Devices.push(PartConfig);
                             }
