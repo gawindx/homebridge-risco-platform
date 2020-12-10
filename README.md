@@ -1,3 +1,7 @@
+# homebridge-risco-platform
+
+[![Donate](https://img.shields.io/badge/Donate-PayPal-green.svg)](https://www.paypal.com/donate?hosted_button_id=FAFJ3ZKMENGCU)
+
 This is plugin that integrate Homebridge with Risco Cloud Alarm Security System.
 
 Integration works only when proper Ethernet module is added to your Risco Unit and you are able to arm & disarm your system via https://www.riscocloud.com/ELAS/WebUI.
@@ -230,3 +234,9 @@ In that case "12345" is your siteId which should be placed in new config file.
 * Add Cameras (Partially done but may not be usable)
 * Add the ability to define custom detector types - Partially made with the support of "Custom" detectors
 (water / fire / gas / CO2 / temperature threshold detector) as the risco hardware supports. This information does not go back in the REST API iRisco, it requires a manual addition (Also requires that the hardware configuration of the entry be considered as a detection area, otherwise the entry will not be accessible via the Risco APIs)
+
+
+## Donation
+If you want to support this project or reward the work done, you can do so here:
+
+[![paypal](https://www.paypalobjects.com/en_US/FR/i/btn/btn_donateCC_LG.gif)](https://www.paypal.com/donate?hosted_button_id=FAFJ3ZKMENGCU)
