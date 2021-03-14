@@ -254,6 +254,9 @@ class RiscoPanelSession {
                 if (response.data.status > 400) {
                     if (response.data.status == 401) {
                         return await self.Login();
+                    } else if (response.data.status == 401) {
+                        self.log.error('Invalid Site ID code. Check your entry !!!');
+                        return false;
                     } else {
                         self.log.error(`Error ${response.data.status}\n${response.data.errorText}`);
                         return false;
@@ -315,6 +318,7 @@ class RiscoPanelSession {
                 2: 'partial',
                 3: 'armed'
             };
+            self.log.info('Partinfo : %s', self.Partition)
             if (self.Partition == 'system') {
                     var Part_Data = {
                         Id: 0,

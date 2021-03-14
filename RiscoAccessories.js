@@ -776,10 +776,10 @@ class RiscoCPBaseDetectors {
             if (self.secondCharac !== undefined) {
                 self.mainService.updateCharacteristic(self.secondCharac, self.GetAccessoryState(self.RiscoDetectorState));
             }
-            self.ExcludeService.updateCharacteristic(self.Characteristic.On, ((self.RiscoDetectorBypassState) ? false : true));
+            self.ExcludeService.updateCharacteristic(self.Characteristic.On, self.RiscoDetectorBypassState);
             return;
         } catch (err) {
-            self.log.error('Error on RiscoCPCDoor/ReportAccessoryState:\n%s', err);
+            self.log.error('Error on RiscoBaseDetectors/ReportAccessoryState:\n%s', err);
             return;
         }
     }
@@ -857,7 +857,7 @@ class RiscoCPBaseDetectors {
                     .interval(500)
                     .times(15)
                     .condition( () => {
-                        return (self.RiscoDetectorBypassState)?false : true;
+                        return self.RiscoDetectorBypassState;
                     })
                     .done(async function (result) {
                         await self.RiscoSession.getCPStates();
@@ -884,10 +884,9 @@ class RiscoCPBaseDetectors {
                 if (PartStatus != 'disarmed') {
                     self.log.info('Cannot Modify Exclude State of Sensor from Armed Partition');
                     typeof callback === 'function' && callback('Cannot Modify Exclude State of Sensor from Armed Partition', 'Cannot Modify Exclude State of Sensor from Armed Partition');
-                    self.ExcludeService.updateCharacteristic(self.Characteristic.On, (self.RiscoDetectorBypassState)?false : true);
+                    self.ExcludeService.updateCharacteristic(self.Characteristic.On, self.RiscoDetectorBypassState);
                     return;
                 }
-                state = ((state) ? false : true);
                 self.log.debug('Set Exclude State of %s "%s" to: %s', self.sPrefix, self.name, ((state) ? 'Bypassed': 'Not Bypassed'));
                 self.log.debug('%s Actual State: %s', self.name, ((self.RiscoDetectorBypassState) ? 'Bypassed': 'Not Bypassed'));
                 self.log.debug('%s New State: %s', self.name, ((state) ? 'Bypassed': 'Not Bypassed'));
@@ -912,7 +911,7 @@ class RiscoCPBaseDetectors {
             }
         } catch (err) {
             self.log.error('Error on RiscoCPBaseDetectors/setCurrentExcludeState:\n%s', err);
-            self.ExcludeService.updateCharacteristic(self.Characteristic.On, (self.RiscoDetectorBypassState)?false : true);
+            self.ExcludeService.updateCharacteristic(self.Characteristic.On, self.RiscoDetectorBypassState);
             callback(err);
             return;
         }

@@ -345,7 +345,6 @@ class RiscoPanelPlatform {
         this.log.info('Discovering Phase Started');
         try{
             let PanelDatas = await this.RiscoPanel.getCPStates();
-                
             if (((this.config['Partition'] || 'none') != 'none') && (PanelDatas.Partitions !== undefined)) {
                 this.log.debug('Discovering Partitions');
                 this.DiscoveredAccessories.Partitions = await this.RiscoPanel.DiscoverParts(PanelDatas.Partitions);
@@ -484,7 +483,8 @@ class RiscoPanelPlatform {
             if ((Object.keys(this.DiscoveredAccessories).length == 0 ) && (PanelDatas.Partitions !== undefined)) {
                 this.log.debug('Fallback to system mode');
                 this.config['Partition'] = 'system';
-                this.DiscoveredAccessories.Partitions = await this.RiscoPanel.DiscoverParts();   
+                this.RiscoPanel.Partition = 'system'
+                this.DiscoveredAccessories.Partitions = await this.RiscoPanel.DiscoverParts(PanelDatas.Partitions);   
             }
             if (((this.config['Custom'] || 'none') != 'none') && (this.DiscoveredAccessories.Detectors !== undefined)) {
                 this.log.info('Apply Custom Configuration');

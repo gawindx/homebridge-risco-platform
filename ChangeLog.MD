@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.2.4 (2021-14-03)
+* Fix axios version depedency (CVE-2020-28168)
+* Inversion of the state of the exclude switch to report only the state of exclusion and no longer the reverse (suggested by andyblac #38)
+* Fixed a bug preventing switching to 'system' mode when no accessory information is defined
+* Addition of specific information in the case of error 422 (bad site ID - related to issue #35)
+
 ## 1.2.3 (2020-06-12)
 * Fix an error on the occupancy sensor which generates an initialization error when no Detector is defined (#30 and #31)
 * Added a function to prevent Circular JSON definition error (#31). This error seems to be present when using a version of Homebridge = 1.1.6
