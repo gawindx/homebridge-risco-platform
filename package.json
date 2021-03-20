@@ -7,6 +7,7 @@
   "license": "ISC",
   "author": "Gawindx",
   "publishConfig": {
+    "cache": "~/.npm",
     "registry": "https://registry.npmjs.org/"
   },
   "repository": {
