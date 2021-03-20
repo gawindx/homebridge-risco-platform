@@ -51,13 +51,14 @@ Configuration sample:
         {
             "platform": "RiscoAlarm",
             "name": "Home Alarm",
+            "polling": true|false,
+            "pollInterval": 10000,
+            "riscoCloudDomainURL": "",
             "riscoUsername": "",                
             "riscoPassword": "",
             "riscoSiteId": 12345,
             "riscoPIN": "",
             "OccupancyPreventArming": true|false,
-            "polling": true|false,
-            "pollInterval": 10000,
             "armCommand": "armed|partially|disarmed",
             "partialCommand": "armed|partially|disarmed",
             "homeCommand": "armed|partially|disarmed",
@@ -100,6 +101,8 @@ Fields:
     *The cumulative communication times between Homekit/RiscoCloud/Panel can go up to several seconds and a too short polling time can cause the appearance of spurious notifications during an arming / disarming request (phenomena not observed for other actions ).*
     *Therefore, it is not recommended to use a delay of less than 5 seconds.*
     *[See issue relating to this phenomenon](https://github.com/gawindx/homebridge-risco-platform/issues/42)*
+
+* "riscoCloudDomainURL" => Parameter Optional and experimental: URL of the RiscoCloud used to connect. In some countries, this url is not www.riscolcoud.com (eg in China).
 
 * "armCommand": Override default value for arming (default to "armed"). 
     Accept any of this value :

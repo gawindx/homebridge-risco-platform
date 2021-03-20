@@ -2,7 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
-## 1.2.5 (2021-14-03)
+## 1.2.6 (2021-20-03)
+* Addition of the possibility to define the url of the RiscoCloud (Experimental function and not assuming the version of the RiscoCloud available behind the given URL)
+
+## 1.2.5 (2021-20-03)
 * Fixed a bad error code in the processing of responses to the second step of connecting to RiscoCloud
 * Added warning about too short polling time in README.md (Avoid using a polling time of less than 5 seconds).
 

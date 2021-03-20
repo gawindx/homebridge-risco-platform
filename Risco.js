@@ -54,7 +54,8 @@ class RiscoPanelSession {
         this.DiscoveredAccessories ;
         this.risco_panel_name = aConfig['name'];
         this.polling = aConfig['polling'] || false;
-        this.pollInterval = aConfig['pollInterval'] || 30000;
+        this.pollInterval = aConfig['pollInterval'] || 10000;
+        this.riscoCloudDomainURL = aConfig['riscoCloudDomainURL'] || 'www.riscocloud.com' ;
         this.risco_username = encodeURIComponent(aConfig['riscoUsername']);
         this.risco_username = aConfig['riscoUsername'];
         this.risco_password = encodeURIComponent(aConfig['riscoPassword']);
@@ -170,7 +171,7 @@ class RiscoPanelSession {
         try{
             if (!self.SessionLogged) {
                 const response = await axios({
-                    url: 'https://www.riscocloud.com/webapi/api/auth/login',
+                    url: `https://${self.riscoCloudDomainURL}/webapi/api/auth/login`,
                     method: 'POST',
                     json: true,
                     headers: {
@@ -228,7 +229,7 @@ class RiscoPanelSession {
         try {
             var response;
             response = await axios({
-                url: `https://www.riscocloud.com/webapi/api/wuws/site/${self.risco_siteId}/Login`,
+                url: `https://${self.riscoCloudDomainURL}/webapi/api/wuws/site/${self.risco_siteId}/Login`,
                 method: 'POST',
                 json: true,
                 headers: {
@@ -1005,7 +1006,7 @@ class RiscoPanelSession {
             if (self.SessionLogged) {
                 self.log.debug('RiscoPanelSession is Ready');
                 const responsePanel = await axios({
-                    url: `https://www.riscocloud.com/webapi/api/wuws/site/${self.risco_siteId}/ControlPanel/GetState`,
+                    url: `https://${self.riscoCloudDomainURL}/webapi/api/wuws/site/${self.risco_siteId}/ControlPanel/GetState`,
                     method: 'POST',
                     headers: {
                         'User-Agent': `${iRiscoUserAgent}`,
@@ -1027,7 +1028,7 @@ class RiscoPanelSession {
                 });
 
                 const responseCameras = await axios({
-                    url: `https://www.riscocloud.com/webapi/api/wuws/site/${self.risco_siteId}/camera/GetAll`,
+                    url: `https://${self.riscoCloudDomainURL}/webapi/api/wuws/site/${self.risco_siteId}/camera/GetAll`,
                     method: 'POST',
                     headers: {
                         'User-Agent': `${iRiscoUserAgent}`,
@@ -1159,7 +1160,7 @@ class RiscoPanelSession {
                             });
                 }
                 const response = await axios({
-                    url: `https://www.riscocloud.com/webapi/api/wuws/site/${self.risco_siteId}/ControlPanel/PartArm`,
+                    url: `https://${self.riscoCloudDomainURL}/webapi/api/wuws/site/${self.risco_siteId}/ControlPanel/PartArm`,
                     method: 'POST',
                     json: true,
                     headers: {
@@ -1239,7 +1240,7 @@ class RiscoPanelSession {
             if (!(await self.SessionValidity())) { return false; }
             if (self.SessionLogged) {
                 const response = await axios({
-                    url: `https://www.riscocloud.com/webapi/api/wuws/site/${self.risco_siteId}/ControlPanel/SetOutputStatus`,
+                    url: `https://${self.riscoCloudDomainURL}/webapi/api/wuws/site/${self.risco_siteId}/ControlPanel/SetOutputStatus`,
                     method: 'POST',
                     json: true,
                     headers: {
@@ -1287,7 +1288,7 @@ class RiscoPanelSession {
             if (!(await self.SessionValidity())) { return false; }
             if (self.SessionLogged) {
                 const response = await axios({
-                    url: `https://www.riscocloud.com/webapi/api/wuws/site/${self.risco_siteId}/ControlPanel/SetZoneBypassStatus`,
+                    url: `https://${self.riscoCloudDomainURL}/webapi/api/wuws/site/${self.risco_siteId}/ControlPanel/SetZoneBypassStatus`,
                     method: 'POST',
                     json: true,
                     headers: {

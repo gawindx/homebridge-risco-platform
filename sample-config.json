@@ -1,10 +1,11 @@
 {
     "accessories": [
         {
-            "accessory": "RiscoAlarm",
+            "platform": "RiscoAlarm",
             "name": "RiscoAlarm",
             "polling": true|false,
             "pollInterval": 10000,
+            "riscoCloudDomainURL": "",
             "riscoUsername": "",
             "riscoPassword": "",
             "riscoSiteId": 12345,
