@@ -254,7 +254,7 @@ class RiscoPanelSession {
                 if (response.data.status > 400) {
                     if (response.data.status == 401) {
                         return await self.Login();
-                    } else if (response.data.status == 401) {
+                    } else if (response.data.status == 422) {
                         self.log.error('Invalid Site ID code. Check your entry !!!');
                         return false;
                     } else {
