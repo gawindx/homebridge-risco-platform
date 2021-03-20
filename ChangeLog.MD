@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.2.5 (2021-14-03)
+* Fixed a bad error code in the processing of responses to the second step of connecting to RiscoCloud
+* Added warning about too short polling time in README.md (Avoid using a polling time of less than 5 seconds).
+
 ## 1.2.4 (2021-14-03)
 * Fix axios version depedency (CVE-2020-28168)
 * Inversion of the state of the exclude switch to report only the state of exclusion and no longer the reverse (suggested by andyblac #38)
