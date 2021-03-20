@@ -97,6 +97,10 @@ Fields:
 * "polling" => optional: true|false - poll for latest RiscoCloud status (Default to false)
 * "pollInterval" => optional: time in ms for polling (Default to 10000)
 
+    *The cumulative communication times between Homekit/RiscoCloud/Panel can go up to several seconds and a too short polling time can cause the appearance of spurious notifications during an arming / disarming request (phenomena not observed for other actions ).*
+    *Therefore, it is not recommended to use a delay of less than 5 seconds.*
+    *[See issue relating to this phenomenon](https://github.com/gawindx/homebridge-risco-platform/issues/42)*
+
 * "armCommand": Override default value for arming (default to "armed"). 
     Accept any of this value :
     * "armed" : set Partition/System to "armed"
