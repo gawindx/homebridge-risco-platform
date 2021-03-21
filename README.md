@@ -58,6 +58,7 @@ Configuration sample:
             "riscoPassword": "",
             "riscoSiteId": 12345,
             "riscoPIN": "",
+            "logRCResponse": true|false,
             "OccupancyPreventArming": true|false,
             "armCommand": "armed|partially|disarmed",
             "partialCommand": "armed|partially|disarmed",
@@ -92,17 +93,20 @@ Fields:
 * "platform" => Mandatory: Must always be "RiscoAlarm" (required)
 * "name" => Mandatory: Can be anything (used in logs)
 * "riscoUsername", "riscoPassword" => Mandatory: UserName and Password for you Web interface to RiscoCloud
-* "riscoSiteId"=> Mandatory: This is your siteId to login.
-* "riscoPIN"=> Mandatory: PIN Code used for arm/disarm
-* "OccupancyPreventArming"=> optional: true|false - if set to true, Full or Partial Arming cannot be done if Occupancy is detected (default to true),
-* "polling" => optional: true|false - poll for latest RiscoCloud status (Default to false)
-* "pollInterval" => optional: time in ms for polling (Default to 10000)
+* "riscoSiteId" => Mandatory: This is your siteId to login.
+* "riscoPIN" => Mandatory: PIN Code used for arm/disarm
+* "OccupancyPreventArming" => Optional: true|false - if set to true, Full or Partial Arming cannot be done if Occupancy is detected (default to true),
+* "polling" => Optional: true|false - poll for latest RiscoCloud status (Default to false)
+* "pollInterval" => Optional: time in ms for polling (Default to 10000)
 
     *The cumulative communication times between Homekit/RiscoCloud/Panel can go up to several seconds and a too short polling time can cause the appearance of spurious notifications during an arming / disarming request (phenomena not observed for other actions ).*
     *Therefore, it is not recommended to use a delay of less than 5 seconds.*
     *[See issue relating to this phenomenon](https://github.com/gawindx/homebridge-risco-platform/issues/42)*
 
-* "riscoCloudDomainURL" => Parameter Optional and experimental: URL of the RiscoCloud used to connect. In some countries, this url is not www.riscolcoud.com (eg in China).
+* "riscoCloudDomainURL" => Optional : (experimental) URL of the RiscoCloud used to connect. In some countries, this url is not www.riscolcoud.com (eg in China).
+
+* "logRCResponse"=> optional: true|false - This option adds the responses from RiscoCloud to the Homebridge logs.
+    In the event of a processing error, activating this option provides more information for understanding the malfunction.
 
 * "armCommand": Override default value for arming (default to "armed"). 
     Accept any of this value :

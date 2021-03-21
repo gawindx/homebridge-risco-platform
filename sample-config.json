@@ -10,6 +10,7 @@
             "riscoPassword": "",
             "riscoSiteId": 12345,
             "riscoPIN": "",
+            "logRCResponse": true|false,
             "OccupancyPreventArming": true|false,
             "armCommand": "armed|partially|disarmed",
             "partialCommand": "armed|partially|disarmed",

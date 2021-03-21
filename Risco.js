@@ -63,6 +63,7 @@ class RiscoPanelSession {
         this.risco_siteId = aConfig['riscoSiteId'];
         this.risco_Language = `${aConfig['languageID'] || 'en'}-${aConfig['languageID']|| 'en'}`;
         this.risco_pincode = aConfig['riscoPIN'];
+        this.logRCResponse = aConfig['logRCResponse'] ||false;
         this.Custom_Cmd = false;
         this.api = api;
         var self = this;
@@ -192,6 +193,7 @@ class RiscoPanelSession {
                     setTimeout( () => { self.SessionValidity(); }, 5000);
                     return false;
                 });
+                if (self.logRCResponse == true) {self.log.error(`Login RC_Response :\n${JSON.stringify(response.data, JSONreplacer(), 4)}`)};
                 if ((response.status !== undefined) && (response.status == 200) && (response.statusText == 'OK')) {
                     if (response.data.status > 400) {
                         self.log.error(`Error ${response.data.status}\n${response.data.errorText}`);
@@ -251,6 +253,7 @@ class RiscoPanelSession {
                 setTimeout( () => { self.SessionValidity(); }, 5000);
                 return false;
             });
+            if (self.logRCResponse == true) {self.log.error(`GetSessionId RC_Response :\n${JSON.stringify(response.data, JSONreplacer(), 4)}`)};
             if ((response.status !== undefined) && (response.status == 200) && (response.statusText == 'OK')) {
                 if (response.data.status > 400) {
                     if (response.data.status == 401) {
@@ -1047,6 +1050,7 @@ class RiscoPanelSession {
                     self.log.error(NetworkErrorMsg(error));
                     return PanelDatas;
                 });
+                if (self.logRCResponse == true) {self.log.error(`getCPStates Panel RC_Response :\n${JSON.stringify(responsePanel.data, JSONreplacer(), 4)}`)};
                 if ((responsePanel.status == 200) && (responsePanel.statusText == 'OK') 
                     && (responsePanel.data.response !== null)) {
                     const RPStatus = responsePanel.data.response.state.status;
@@ -1067,6 +1071,7 @@ class RiscoPanelSession {
                             });
                     }
                 }
+                if (self.logRCResponse == true) {self.log.error(`getCPStates Cameras RC_Response :\n${JSON.stringify(responseCameras.data, JSONreplacer(), 4)}`)};
                 if ((responseCameras.status == 200 ) && (responseCameras.statusText == 'OK') 
                     && (responseCameras.data.response !== null)) {
                     PanelDatas.Cameras = responseCameras.data.response;
@@ -1114,7 +1119,6 @@ class RiscoPanelSession {
             }
             return true;
         } catch (err) {
-
             self.log.error('Error on UpdateCPStates: %s', err);
             self.log.debug('Leaving UpdateCPStates function');
             return false;
@@ -1179,7 +1183,7 @@ class RiscoPanelSession {
                     return [0, NaN];
                 });
                 if (response.data.status == 200) {
-                    //self.log.error('response arm: %s', JSON.Stringify(response.data))
+                    if (self.logRCResponse == true) {self.log.error(`armDisarm RC_Response :\n${JSON.stringify(response.data, JSONreplacer(), 4)}`)};
                     var PanelDatas = {};
                     PanelDatas.Partitions = response.data.response.partitions;
                     if (!typeGroup) {
@@ -1265,6 +1269,7 @@ class RiscoPanelSession {
                     self.log.error(NetworkErrorMsg(error));
                     return false;
                 });
+                if (self.logRCResponse == true) {self.log.error(`OutputCommand RC_Response :\n${JSON.stringify(response.data, JSONreplacer(), 4)}`)};
                 if ( (response.data.status == 200) && (response.data.response !== null)){
                     self.log.debug('OutputCommand Ok. Using this result for status update');
                     await self.getOutputsStates(response.data.response.haDevices);
@@ -1312,6 +1317,7 @@ class RiscoPanelSession {
                     self.log.error(NetworkErrorMsg(error));
                     return false;
                 });
+                if (self.logRCResponse == true) {self.log.error(`SetBypass RC_Response :\n${JSON.stringify(response.data, JSONreplacer(), 4)}`)};
                 if (response.data.status == 200) {
                     self.log.debug('SetBypass Ok. Using this result for status update');
                     await self.getDetectorsStates(response.data.response.zones);

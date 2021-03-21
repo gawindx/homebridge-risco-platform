@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.2.7 (2021-21-03)
+* Added a new option to log RiscoCloud responses to improve resolution of response processing issues.
+  This option is disabled by default.
+  Warning: certain sensitive data can be displayed in these logs (IP address and password of cameras in particular).
+
 ## 1.2.6 (2021-20-03)
 * Addition of the possibility to define the url of the RiscoCloud (Experimental function and not assuming the version of the RiscoCloud available behind the given URL)
 
