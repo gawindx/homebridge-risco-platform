@@ -345,6 +345,11 @@ class RiscoPanelPlatform {
         this.log.info('Discovering Phase Started');
         try{
             let PanelDatas = await this.RiscoPanel.getCPStates();
+            if (this.RiscoPanel.PanelType = 0 ) {
+                this.log.debug('Because this Panel does not provide Partitions and Group information, a default configuration will be applied!');
+                this.config['Partition'] = this.RiscoPanel.Partition = 'system';
+                this.config['Groups'] = this.RiscoPanel.Groups = 'none';
+            }
             if (((this.config['Partition'] || 'none') != 'none') && (PanelDatas.Partitions !== undefined)) {
                 this.log.debug('Discovering Partitions');
                 this.DiscoveredAccessories.Partitions = await this.RiscoPanel.DiscoverParts(PanelDatas.Partitions);

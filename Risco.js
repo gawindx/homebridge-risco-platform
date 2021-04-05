@@ -8,6 +8,22 @@ const CommonNetError = {
     'ENOTFOUND': 'DNS Hostname Not Found. Verify your Internet Connection!!!'
 };
 
+const PanelTypeID = {
+    '060': 0,
+    '224': 2,
+    '300': 3,
+    '400': 4
+};
+
+const PanelTypeName = {
+    0: 'iConnect',
+    1: 'CommPact',
+    2: 'Agility 3/4',
+    3: 'LightSYS',
+    4: 'ProSYS Plus / GT Plus',
+    5: 'WiComm / WiComm Pro'
+};
+
 const JSONreplacer = () => {
     const visited = new WeakSet();
     return (key, value) => {
@@ -41,7 +57,36 @@ const NetworkErrorMsg = (error) => {
     } else {
         return `Error on Request : ${error.errno}\n Code : ${error.code}`;
     }
-}
+};
+
+const RCResponseCleaner = (RC_Response) => {
+    //Login Response Stage 1
+    if (RC_Response.response.accessToken != undefined) {
+        RC_Response.response.accessToken = 'XXXXX';
+        RC_Response.response.refreshToken = 'XXXXX';
+    } else if (RC_Response.response.cpId !== undefined) {
+    //Login Response Stage 2
+        RC_Response.response.cpId = 'XXXXXXXXX';
+        RC_Response.response.sessionId = 'XXXXXXXXX'
+    } else if (RC_Response.response.cpid !== undefined) {
+    //getCPStates Panel Response
+        RC_Response.response.cpid = 'XXXXXXXXX';
+        RC_Response.response.state.status.users = '';
+        Object.values(RC_Response.response.state.status.zones)
+            .forEach( zone => zone.regDevSN = 'XXXXXXXXX');
+    } else {
+            Object.values(RC_Response.response)
+                .forEach( camInfos => {
+                    camInfos.cameraParameters = '';
+                    camInfos.uId = 'XXXXXXXXX';
+                    camInfos.cameraIp = 'XXX.XXX.XXX.XXX';
+                    camInfos.cameraPort = 'XXXXX';
+                    camInfos.nvrId = 'XXX';
+                    camInfos.nvrChannelNo = 'XXX';
+                });
+    }
+    return RC_Response;
+};
 
 class RiscoPanelSession {
     constructor(aConfig, aLog, api) {
@@ -118,6 +163,7 @@ class RiscoPanelSession {
         this.LastEvent = null;
         this.BadResponseCounter = 0;
         this.PanelDatas;
+        this.PanelType = undefined;
 
         this.long_event_name = ('RPS_long_%s', (this.risco_panel_name.toLowerCase()).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ /g, '_'));
         this.PollingLoop();
@@ -193,7 +239,10 @@ class RiscoPanelSession {
                     setTimeout( () => { self.SessionValidity(); }, 5000);
                     return false;
                 });
-                if (self.logRCResponse == true) {self.log.error(`Login RC_Response :\n${JSON.stringify(response.data, JSONreplacer(), 4)}`)};
+                if (self.logRCResponse == true) {
+                    const RC_Response = RCResponseCleaner(JSON.parse(JSON.stringify(response.data)));
+                    self.log.error(`Login RC_Response :\n${JSON.stringify(RC_Response, JSONreplacer(), 4)}`);
+                };
                 if ((response.status !== undefined) && (response.status == 200) && (response.statusText == 'OK')) {
                     if (response.data.status > 400) {
                         self.log.error(`Error ${response.data.status}\n${response.data.errorText}`);
@@ -253,7 +302,10 @@ class RiscoPanelSession {
                 setTimeout( () => { self.SessionValidity(); }, 5000);
                 return false;
             });
-            if (self.logRCResponse == true) {self.log.error(`GetSessionId RC_Response :\n${JSON.stringify(response.data, JSONreplacer(), 4)}`)};
+            if (self.logRCResponse == true) {
+                const RC_Response = RCResponseCleaner(JSON.parse(JSON.stringify(response.data)));
+                self.log.error(`GetSessionId RC_Response :\n${JSON.stringify(RC_Response, JSONreplacer(), 4)}`);
+            };
             if ((response.status !== undefined) && (response.status == 200) && (response.statusText == 'OK')) {
                 if (response.data.status > 400) {
                     if (response.data.status == 401) {
@@ -266,6 +318,18 @@ class RiscoPanelSession {
                         return false;
                     }
                 }
+                if (self.PanelType === undefined) {
+                    const PanelSubId = (response.data.response.cpId).substring(0,3);
+                    if (PanelTypeID[PanelSubId] !== undefined) {
+                        self.PanelType = PanelTypeID[PanelSubId];
+                        self.log.error(`Detected Panel Type : ${PanelTypeName[self.PanelType]}`);
+                    } else {
+                        self.log.error('Unknow Panel Type. This plugin may not work properly !!!!!');
+                    }
+                } else {
+                        self.log.error('Unknow Panel Type. This plugin may not work properly !!!!!');
+                };
+
                 self.SessionLogged = true;
                 self.log.debug('Cloud Session OK');
                 self.log.info('Retrieving Cloud Session: Ok');
@@ -363,6 +427,7 @@ class RiscoPanelSession {
                     };
                     Parts_Datas[0] = Part_Data;
                     Parts_Datas.type = 'system';
+                    self.log.debug('Discovering Partition : %s with Id: %s', Parts_Datas[0].name, Parts_Datas[0].id);
             } else {
                 for (var PartId in PartitionsDatas) {
                     var Part_Data = {
@@ -570,36 +635,40 @@ class RiscoPanelSession {
                             Id: detector.zoneID,
                             Bypassed: ((detector.status == 2) ? true : false),
                             Partition: ( () => {
-                                const AssocMask = detector.partAssocMask
-                                    .replace('A', '')
-                                    .replace(/=/g, '');
                                 var DPart = [];
-                                for (let charMask of AssocMask) {
-                                    switch (charMask) {
-                                        case 'Q':
-                                            //Partition 1 id:0
-                                            DPart.push(0);
-                                            break;
-                                        case 'g':
-                                            //Partition 2 id:1
-                                            DPart.push(1);
-                                            break;
-                                        case 'B':
-                                            //Partition 3 id:2
-                                            DPart.push(2);
-                                            break;
-                                        case 'C':
-                                            //Partition 4 id:3
-                                            DPart.push(3);
-                                            break;
-                                        case 'w':
-                                            //Partition 1 and 2 id:0 and id:1
-                                            DPart.push.apply(DPart, [0,1]);
-                                            break;
-                                        case 'D':
-                                            //Partition 3 and 4 id:2 and id:3
-                                            DPart.push.apply(DPart, [2,3]);
-                                            break;
+                                if (self.PanelType = 0 ) {
+                                    DPart.push(0);
+                                } else {
+                                    const AssocMask = detector.partAssocMask
+                                        .replace('A', '')
+                                        .replace(/=/g, '');
+                                    for (let charMask of AssocMask) {
+                                        switch (charMask) {
+                                            case 'Q':
+                                                //Partition 1 id:0
+                                                DPart.push(0);
+                                                break;
+                                            case 'g':
+                                                //Partition 2 id:1
+                                                DPart.push(1);
+                                                break;
+                                            case 'B':
+                                                //Partition 3 id:2
+                                                DPart.push(2);
+                                                break;
+                                            case 'C':
+                                                //Partition 4 id:3
+                                                DPart.push(3);
+                                                break;
+                                            case 'w':
+                                                //Partition 1 and 2 id:0 and id:1
+                                                DPart.push.apply(DPart, [0,1]);
+                                                break;
+                                            case 'D':
+                                                //Partition 3 and 4 id:2 and id:3
+                                                DPart.push.apply(DPart, [2,3]);
+                                                break;
+                                        }
                                     }
                                 }
                                 return DPart.sort(function(a, b) {
@@ -794,7 +863,6 @@ class RiscoPanelSession {
                         if (ExitDelay < Math.max(part_datas.exitDelayTO)) {
                             ExitDelay = Math.max(part_datas.exitDelayTO);
                         }
-
                     });
                 if (ExitDelay != 0) {
                     self.DiscoveredAccessories.Partitions[0].ExitDelay = ExitDelay;
@@ -1038,7 +1106,7 @@ class RiscoPanelSession {
                         'Authorization': `Bearer ${self.accessToken}`
                     },
                     data: {
-                        "sessionToken": `${self.SessionId}`
+                        'sessionToken': `${self.SessionId}`
                     },
 
                     validateStatus(status) {
@@ -1050,10 +1118,29 @@ class RiscoPanelSession {
                     self.log.error(NetworkErrorMsg(error));
                     return PanelDatas;
                 });
-                if (self.logRCResponse == true) {self.log.error(`getCPStates Panel RC_Response :\n${JSON.stringify(responsePanel.data, JSONreplacer(), 4)}`)};
+                if (self.logRCResponse == true) {
+                    const RC_Response = RCResponseCleaner(JSON.parse(JSON.stringify(responsePanel.data)));
+                    self.log.error(`getCPStates Panel RC_Response :\n${JSON.stringify(RC_Response, JSONreplacer(), 4)}`);
+                };
                 if ((responsePanel.status == 200) && (responsePanel.statusText == 'OK') 
                     && (responsePanel.data.response !== null)) {
+
                     const RPStatus = responsePanel.data.response.state.status;
+                    if (self.PanelType = 0 ) {
+                        RPStatus.partitions = [
+                            {
+                                'id': 0,
+                                'armedState': ( () => {
+                                                        return (RPStatus.systemStatus + 1);
+                                                        })(),
+                                'readyState': undefined,
+                                'alarmState': (RPStatus.alarmPending == 'true'? 1 : 0),
+                                'groups': null,
+                                'exitDelayTO': RPStatus.exitDelayTimeout,
+                                'lastArmFailReasons': null
+                            }
+                        ];
+                    };
                     PanelDatas.Partitions = RPStatus.partitions;
                     PanelDatas.Detectors = RPStatus.zones;
                     PanelDatas.Outputs = RPStatus.haDevices;
@@ -1071,7 +1158,10 @@ class RiscoPanelSession {
                             });
                     }
                 }
-                if (self.logRCResponse == true) {self.log.error(`getCPStates Cameras RC_Response :\n${JSON.stringify(responseCameras.data, JSONreplacer(), 4)}`)};
+                if (self.logRCResponse == true) {
+                    const RC_Response = RCResponseCleaner(JSON.parse(JSON.stringify(responseCameras.data)));
+                    self.log.error(`getCPStates Cameras RC_Response :\n${JSON.stringify(RC_Response, JSONreplacer(), 4)}`);
+                };
                 if ((responseCameras.status == 200 ) && (responseCameras.statusText == 'OK') 
                     && (responseCameras.data.response !== null)) {
                     PanelDatas.Cameras = responseCameras.data.response;
@@ -1183,7 +1273,10 @@ class RiscoPanelSession {
                     return [0, NaN];
                 });
                 if (response.data.status == 200) {
-                    if (self.logRCResponse == true) {self.log.error(`armDisarm RC_Response :\n${JSON.stringify(response.data, JSONreplacer(), 4)}`)};
+                    if (self.logRCResponse == true) {
+                        const RC_Response = RCResponseCleaner(JSON.parse(JSON.stringify(response.data)));
+                        self.log.error(`armDisarm RC_Response :\n${JSON.stringify(RC_Response, JSONreplacer(), 4)}`);
+                    };
                     var PanelDatas = {};
                     PanelDatas.Partitions = response.data.response.partitions;
                     if (!typeGroup) {
@@ -1269,7 +1362,10 @@ class RiscoPanelSession {
                     self.log.error(NetworkErrorMsg(error));
                     return false;
                 });
-                if (self.logRCResponse == true) {self.log.error(`OutputCommand RC_Response :\n${JSON.stringify(response.data, JSONreplacer(), 4)}`)};
+                if (self.logRCResponse == true) {
+                    const RC_Response = RCResponseCleaner(JSON.parse(JSON.stringify(response.data)));
+                    self.log.error(`OutputCommand RC_Response :\n${JSON.stringify(RC_Response, JSONreplacer(), 4)}`);
+                };
                 if ( (response.data.status == 200) && (response.data.response !== null)){
                     self.log.debug('OutputCommand Ok. Using this result for status update');
                     await self.getOutputsStates(response.data.response.haDevices);
@@ -1317,7 +1413,10 @@ class RiscoPanelSession {
                     self.log.error(NetworkErrorMsg(error));
                     return false;
                 });
-                if (self.logRCResponse == true) {self.log.error(`SetBypass RC_Response :\n${JSON.stringify(response.data, JSONreplacer(), 4)}`)};
+                if (self.logRCResponse == true) {
+                    const RC_Response = RCResponseCleaner(JSON.parse(JSON.stringify(response.data)));
+                    self.log.error(`SetBypass RC_Response :\n${JSON.stringify(RC_Response, JSONreplacer(), 4)}`);
+                };
                 if (response.data.status == 200) {
                     self.log.debug('SetBypass Ok. Using this result for status update');
                     await self.getDetectorsStates(response.data.response.zones);
