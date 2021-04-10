@@ -10,8 +10,9 @@ const CommonNetError = {
 
 const PanelTypeID = {
     '060': 0,
+    '071': 0,
     '224': 2,
-    '300': 3,
+    '300': 0,
     '400': 4
 };
 
@@ -386,7 +387,6 @@ class RiscoPanelSession {
                 2: 'partial',
                 3: 'armed'
             };
-            self.log.info('Partinfo : %s', self.Partition)
             if (self.Partition == 'system') {
                     var Part_Data = {
                         Id: 0,
@@ -397,7 +397,7 @@ class RiscoPanelSession {
                             var listPart = [];
                             Object.values(PartitionsDatas)
                                 .forEach( part => {
-                                    listPart.push(part.id)
+                                    listPart.push(part.id);
                                 });
                             return listPart;
                         })(),
@@ -636,7 +636,7 @@ class RiscoPanelSession {
                             Bypassed: ((detector.status == 2) ? true : false),
                             Partition: ( () => {
                                 var DPart = [];
-                                if (self.PanelType = 0 ) {
+                                if (self.PanelType == 0 ) {
                                     DPart.push(0);
                                 } else {
                                     const AssocMask = detector.partAssocMask
@@ -1126,7 +1126,7 @@ class RiscoPanelSession {
                     && (responsePanel.data.response !== null)) {
 
                     const RPStatus = responsePanel.data.response.state.status;
-                    if (self.PanelType = 0 ) {
+                    if (self.PanelType == 0 ) {
                         RPStatus.partitions = [
                             {
                                 'id': 0,
