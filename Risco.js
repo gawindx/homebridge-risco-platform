@@ -10,6 +10,7 @@ const CommonNetError = {
 
 const PanelTypeID = {
     '060': 0,
+    '071': 0,
     '224': 2,
     '300': 3,
     '400': 4
