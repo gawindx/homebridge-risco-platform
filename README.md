@@ -1,5 +1,10 @@
 # homebridge-risco-platform
 
+# WARNING.
+# This plugin is no longer maintained for the reasons I mention [here](https://github.com/gawindx/homebridge-risco-platform/issues/45).
+# This plugin remains functional with RiscoCLoud v5.5 but may not be compatible with future versions.
+# For more information on the reasons for stopping development, [see here](https://github.com/gawindx/homebridge-risco-platform/issues/45)
+
 [![Donate](https://img.shields.io/badge/Donate-PayPal-green.svg)](https://www.paypal.com/donate?hosted_button_id=FAFJ3ZKMENGCU)
 
 This is plugin that integrate Homebridge with Risco Cloud Alarm Security System.
